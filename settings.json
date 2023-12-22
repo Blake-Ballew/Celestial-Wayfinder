@@ -1,0 +1,95 @@
+{
+  "User": {
+    "UserID": [0, 0, 0, 0, 0, 0, 0, 0],
+    "Name": {
+      "cfgType": 10,
+      "cfgVal": "User",
+      "dftVal": "User",
+      "maxLen": 12
+    },
+    "Theme Red": {
+      "cfgType": 8,
+      "cfgVal": 0,
+      "dftVal": 0,
+      "maxVal": 255,
+      "minVal": 0,
+      "incVal": 1,
+      "signed": false
+    },
+    "Theme Green": {
+      "cfgType": 8,
+      "cfgVal": 255,
+      "dftVal": 255,
+      "maxVal": 255,
+      "minVal": 0,
+      "incVal": 1,
+      "signed": false
+    },
+    "Theme Blue": {
+      "cfgType": 8,
+      "cfgVal": 0,
+      "dftVal": 0,
+      "maxVal": 255,
+      "minVal": 0,
+      "incVal": 1,
+      "signed": false
+    }
+  },
+  "Device": {
+    "24HTime": false
+  },
+  "Radio": {
+    "Frequency": {
+      "cfgType": 9,
+      "cfgVal": 914.9,
+      "dftVal": 914.9,
+      "maxVal": 914.9,
+      "minVal": 902.3,
+      "incVal": 0.2
+    },
+    "NodeID": {
+      "cfgType": 8,
+      "cfgVal": 1,
+      "dftVal": 1,
+      "maxVal": 254,
+      "minVal": 0,
+      "incVal": 1,
+      "signed": false
+    },
+    "Modem Config": {
+      "cfgType": 11,
+      "cfgVal": 4,
+      "dftVal": 4,
+      "vals": [0, 1, 2, 3, 4],
+      "valTxt": [
+        "125 kHz, 4/5, 128",
+        "500 kHz, 4/5, 128",
+        "31.25 kHz, 4/8, 512",
+        "125 kHz, 4/8, 4096",
+        "125 khz, 4/5, 2048"
+      ]
+    },
+    "Broadcast Retries": {
+      "cfgType": 8,
+      "cfgVal": 3,
+      "dftVal": 3,
+      "maxVal": 5,
+      "minVal": 1,
+      "incVal": 1,
+      "signed": false
+    },
+    "Router": false
+  },
+  "Compass": {
+    "useCalibration": false,
+    "X_MIN": 0,
+    "X_MAX": 0,
+    "Y_MIN": 0,
+    "Y_MAX": 0,
+    "Z_MIN": 0,
+    "Z_MAX": 0
+  },
+  "GPS": {
+    "refreshDelayms": 5000
+  }
+}
