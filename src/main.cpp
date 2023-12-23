@@ -20,75 +20,6 @@ ESP32Encoder encoder(true, enc_cb);
 
 // esp_event_loop_handle_t loop_handle;
 
-#if UPLOAD_SETTINGS == 1
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-
-Adafruit_SSD1306 display(128, 32, &Wire, OLED_RESET);
-
-void setup()
-{
-  bootloader_random_enable();
-  Serial.setRxBufferSize(EEPROM_SETTINGS_SIZE);
-  Serial.setTxBufferSize(EEPROM_SETTINGS_SIZE);
-  Serial.begin(115200);
-
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.clearDisplay();
-  display.setTextSize(1);
-
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-
-  Settings_Manager::init();
-  Settings_Manager::writeSettingsToSerial();
-  delay(1000);
-  Serial.println("Writing settings from code:");
-  Settings_Manager::flashSettings();
-}
-
-void loop()
-{
-  display.clearDisplay();
-  for (uint8_t i = 10; i > 0; i--)
-  {
-    display.setCursor(0, 0);
-    display.print(i);
-    display.display();
-    delay(1000);
-    display.clearDisplay();
-  }
-
-  bool success = true;
-  if (success)
-  {
-    // delay(1000);
-    // display.clearDisplay();
-    // display.setCursor(0, 0);
-    // display.print("Writing to EEPROM");
-    // display.display();
-    // Settings_Manager::writeSettingsToEEPROM();
-
-    delay(1000);
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.print("Writing to Serial");
-    display.display();
-    Settings_Manager::writeSettingsToSerial();
-  }
-  else
-  {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.print("Failed to read from Serial");
-    display.display();
-  }
-  delay(3000);
-}
-
-#else
-
 void setup()
 {
 #if DEBUG == 1
@@ -161,7 +92,7 @@ void loop()
 
   vTaskDelay(60000 / portTICK_PERIOD_MS);
 }
-#endif
+
 /*
 extern "C"
 {
