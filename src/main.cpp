@@ -16,6 +16,8 @@ extern "C"
 #include "bootloader_random.h"
 }
 
+#define DEBUG 1
+
 ESP32Encoder encoder(true, enc_cb);
 
 // esp_event_loop_handle_t loop_handle;
@@ -58,6 +60,8 @@ void setup()
 
 #if DEBUG == 1
   Settings_Manager::writeSettingsToSerial();
+  Serial.println();
+  Settings_Manager::writeMessagesToSerial();
   Serial.println();
 #endif
 
