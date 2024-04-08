@@ -112,16 +112,16 @@ void IRAM_ATTR enc_cb(void *arg)
         if (currCount > prevCount)
         {
 #if DEBUG == 1
-            Serial.println("enc_cb: up");
+            Serial.println("enc_cb: down");
 #endif
-            notification = BIT_SHIFT((uint32_t)EVENT_ENCODER_UP);
+            notification = BIT_SHIFT((uint32_t)EVENT_ENCODER_DOWN);
         }
         else if (currCount < prevCount)
         {
 #if DEBUG == 1
-            Serial.println("enc_cb: down");
+            Serial.println("enc_cb: up");
 #endif
-            notification = BIT_SHIFT((uint32_t)EVENT_ENCODER_DOWN);
+            notification = BIT_SHIFT((uint32_t)EVENT_ENCODER_UP);
         }
         prevCount = currCount;
         xTaskNotifyFromISR(inputTaskHandle, notification, eSetBits, &xHigherPriorityTaskWoken);
@@ -140,7 +140,8 @@ void IRAM_ATTR CompassDRDYISR()
     Navigation_Manager::read();
 }
 
-void enableInterrupts() {
+void enableInterrupts()
+{
     attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
     attachInterrupt(BUTTON_1_PIN, button1ISR, FALLING);
     attachInterrupt(BUTTON_2_PIN, button2ISR, FALLING);
@@ -151,7 +152,8 @@ void enableInterrupts() {
     inputEncoder->setFilter(1023);
 }
 
-void disableInterrupts() {
+void disableInterrupts()
+{
     detachInterrupt(BUTTON_1_PIN);
     detachInterrupt(BUTTON_2_PIN);
     detachInterrupt(BUTTON_3_PIN);

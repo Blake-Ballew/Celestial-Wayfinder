@@ -16,6 +16,11 @@ extern "C"
 #include "bootloader_random.h"
 }
 
+#if DEBUG == 1
+TaskHandle_t debugInputTaskHandle;
+void sendDebugInputs(void *pvParameters);
+#endif
+
 #define DEBUG 1
 
 ESP32Encoder encoder(true, enc_cb);
@@ -55,13 +60,27 @@ void setup()
   OLED_Manager::init();
   System_Utils::init(&OLED_Manager::display);
 
+  // Register interrupt flags to inputIDs
+  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_1), BUTTON_1);
+  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_2), BUTTON_2);
+  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_3), BUTTON_3);
+  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_4), BUTTON_4);
+  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_ENCODER_UP), ENC_UP);
+  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_ENCODER_DOWN), ENC_DOWN);
+  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_MESSAGE_RECEIVED), MESSAGE_RECEIVED);
+
   xTaskCreatePinnedToCore(OLED_Manager::processButtonPressEvent, "inputTask", 8192, NULL, 1, &inputTaskHandle, 0);
   xTaskCreatePinnedToCore(Network_Manager::listenForMessages, "radioTask", 8192, NULL, 1, &radioReadTaskHandle, 1);
+#if DEBUG == 1
+  xTaskCreate(sendDebugInputs, "debugInputTask", 8192, NULL, 1, &debugInputTaskHandle);
+#endif
 
 #if DEBUG == 1
   Settings_Manager::writeSettingsToSerial();
   Serial.println();
   Settings_Manager::writeMessagesToSerial();
+  Serial.println();
+  Settings_Manager::writeCoordsToSerial();
   Serial.println();
 #endif
 
@@ -97,28 +116,24 @@ void loop()
   vTaskDelay(60000 / portTICK_PERIOD_MS);
 }
 
-/*
-extern "C"
+#if DEBUG == 1
+// Takes in a numeric input over serial, shifts a bit by that much, and sends it to the inputTaskHandle
+void sendDebugInputs(void *pvParameters)
 {
-  void app_main(void);
+  uint32_t notification;
+  int input;
+  while (1)
+  {
+    if (Serial.available() > 0)
+    {
+      input = Serial.parseInt();
+      notification = BIT_SHIFT(input - 1);
+      Serial.println();
+      Serial.printf("Passing in input: %d\n", input);
+      Serial.println();
+      xTaskNotify(inputTaskHandle, notification, eSetBits);
+    }
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
 }
-
-void app_main()
-{
-#if DEBIG == 1
-  Serial.begin(115200);
 #endif
-  pinMode(BUTTON_2, INPUT_PULLUP);
-  pinMode(BUTTON_3, INPUT_PULLUP);
-  pinMode(BUTTON_4, INPUT_PULLUP);
-
-  encoder.attachFullQuad(ENC_A, ENC_B);
-  encoder.setCount(0);
-  OLED_Manager::init();
-  xTaskCreate(OLED_Manager::processButtonPressEvent, "inputTask", 4096, NULL, 1, &inputTaskHandle);
-
-  attachInterrupt(BUTTON_2, button2ISR, FALLING);
-  attachInterrupt(BUTTON_3, button3ISR, FALLING);
-  attachInterrupt(BUTTON_4, button4ISR, FALLING);
-}
-*/
