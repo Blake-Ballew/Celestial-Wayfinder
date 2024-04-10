@@ -100,6 +100,7 @@ void setup()
   xTaskNotify(inputTaskHandle, notification, eSetBits);*/
 
   // Network_Manager::listenForMessages(nullptr);
+  // OLED_Manager::flashDefaultSettings(uint8_t(0));
 }
 
 void loop()
