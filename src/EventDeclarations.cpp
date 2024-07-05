@@ -5,15 +5,18 @@
 
 TaskHandle_t inputTaskHandle;
 TaskHandle_t radioReadTaskHandle;
+QueueHandle_t displayCommandQueue;
 
 ESP32Encoder *inputEncoder;
 
-void IRAM_ATTR
-button1ISR()
+void IRAM_ATTR button1ISR()
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    uint32_t notification = BIT_SHIFT((uint32_t)EVENT_BUTTON_1);
-    xTaskNotifyFromISR(inputTaskHandle, notification, eSetBits, &xHigherPriorityTaskWoken);
+    DisplayCommandQueueItem command;
+    command.commandType = INPUT_COMMAND;
+    command.source = USER_INPUT;
+    command.commandData.inputCommand.inputID = BUTTON_1;
+    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
         portYIELD_FROM_ISR();
@@ -23,8 +26,11 @@ button1ISR()
 void IRAM_ATTR button2ISR()
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    uint32_t notification = BIT_SHIFT((uint32_t)EVENT_BUTTON_2);
-    xTaskNotifyFromISR(inputTaskHandle, notification, eSetBits, &xHigherPriorityTaskWoken);
+    DisplayCommandQueueItem command;
+    command.commandType = INPUT_COMMAND;
+    command.source = USER_INPUT;
+    command.commandData.inputCommand.inputID = BUTTON_2;
+    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
         portYIELD_FROM_ISR();
@@ -34,8 +40,11 @@ void IRAM_ATTR button2ISR()
 void IRAM_ATTR button3ISR()
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    uint32_t notification = BIT_SHIFT((uint32_t)EVENT_BUTTON_3);
-    xTaskNotifyFromISR(inputTaskHandle, notification, eSetBits, &xHigherPriorityTaskWoken);
+    DisplayCommandQueueItem command;
+    command.commandType = INPUT_COMMAND;
+    command.source = USER_INPUT;
+    command.commandData.inputCommand.inputID = BUTTON_3;
+    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
         portYIELD_FROM_ISR();
@@ -44,12 +53,12 @@ void IRAM_ATTR button3ISR()
 
 void IRAM_ATTR button4ISR()
 {
-#if DEBUG == 1
-    // Serial.println("button4ISR");
-#endif
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    uint32_t notification = BIT_SHIFT((uint32_t)EVENT_BUTTON_4);
-    xTaskNotifyFromISR(inputTaskHandle, notification, eSetBits, &xHigherPriorityTaskWoken);
+    DisplayCommandQueueItem command;
+    command.commandType = INPUT_COMMAND;
+    command.source = USER_INPUT;
+    command.commandData.inputCommand.inputID = BUTTON_4;
+    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
         portYIELD_FROM_ISR();
@@ -58,39 +67,17 @@ void IRAM_ATTR button4ISR()
 
 void IRAM_ATTR buttonSOSISR()
 {
-#if DEBUG == 1
-    // Serial.println("button4ISR");
-#endif
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    uint32_t notification = BIT_SHIFT((uint32_t)EVENT_BUTTON_SOS);
-    xTaskNotifyFromISR(inputTaskHandle, notification, eSetBits, &xHigherPriorityTaskWoken);
+    DisplayCommandQueueItem command;
+    command.commandType = INPUT_COMMAND;
+    command.source = USER_INPUT;
+    command.commandData.inputCommand.inputID = BUTTON_SOS;
+    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
         portYIELD_FROM_ISR();
     }
 }
-
-/*void IRAM_ATTR encoderUpISR(void *arg)
-{
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    uint32_t notification = BIT_SHIFT((uint8_t)EVENT_ENCODER_UP);
-    xTaskNotifyFromISR(NULL, notification, eSetBits, &xHigherPriorityTaskWoken);
-    if (xHigherPriorityTaskWoken)
-    {
-        portYIELD_FROM_ISR();
-    }
-}
-
-void IRAM_ATTR encoderDownISR(void *arg)
-{
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    uint32_t notification = BIT_SHIFT((uint8_t)EVENT_ENCODER_DOWN);
-    xTaskNotifyFromISR(NULL, notification, eSetBits, &xHigherPriorityTaskWoken);
-    if (xHigherPriorityTaskWoken)
-    {
-        portYIELD_FROM_ISR();
-    }
-}*/
 
 void IRAM_ATTR enc_cb(void *arg)
 {
@@ -107,24 +94,28 @@ void IRAM_ATTR enc_cb(void *arg)
     int64_t currCount = enc->getCount();
     if (currCount % 4 == 0)
     {
-        uint32_t notification = 0;
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        DisplayCommandQueueItem command;
+        command.commandType = INPUT_COMMAND;
+        command.source = USER_INPUT;
         if (currCount > prevCount)
         {
 #if DEBUG == 1
             Serial.println("enc_cb: down");
 #endif
-            notification = BIT_SHIFT((uint32_t)EVENT_ENCODER_DOWN);
+            command.commandData.inputCommand.inputID = ENC_DOWN;
         }
         else if (currCount < prevCount)
         {
 #if DEBUG == 1
             Serial.println("enc_cb: up");
 #endif
-            notification = BIT_SHIFT((uint32_t)EVENT_ENCODER_UP);
+            command.commandData.inputCommand.inputID = ENC_UP;
         }
         prevCount = currCount;
-        xTaskNotifyFromISR(inputTaskHandle, notification, eSetBits, &xHigherPriorityTaskWoken);
+
+        xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
+
         if (xHigherPriorityTaskWoken)
         {
             portYIELD_FROM_ISR();

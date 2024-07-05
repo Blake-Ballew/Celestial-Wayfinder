@@ -60,6 +60,8 @@ void setup()
   OLED_Manager::init();
   System_Utils::init(&OLED_Manager::display);
 
+  displayCommandQueue = OLED_Manager::getDisplayCommandQueue();
+
   // Register interrupt flags to inputIDs
   OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_1), BUTTON_1);
   OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_2), BUTTON_2);
@@ -69,7 +71,7 @@ void setup()
   OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_ENCODER_DOWN), ENC_DOWN);
   OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_MESSAGE_RECEIVED), MESSAGE_RECEIVED);
 
-  xTaskCreatePinnedToCore(OLED_Manager::processButtonPressEvent, "inputTask", 8192, NULL, 1, &inputTaskHandle, 0);
+  xTaskCreatePinnedToCore(OLED_Manager::processCommandQueue, "displayTask", 8192, NULL, 1, &inputTaskHandle, 0);
   xTaskCreatePinnedToCore(Network_Manager::listenForMessages, "radioTask", 8192, NULL, 1, &radioReadTaskHandle, 1);
 #if DEBUG == 1
   xTaskCreate(sendDebugInputs, "debugInputTask", 8192, NULL, 1, &debugInputTaskHandle);
@@ -132,7 +134,11 @@ void sendDebugInputs(void *pvParameters)
       Serial.println();
       Serial.printf("Passing in input: %d\n", input);
       Serial.println();
-      xTaskNotify(inputTaskHandle, notification, eSetBits);
+      DisplayCommandQueueItem command;
+      command.commandType = INPUT_COMMAND;
+      command.source = USER_INPUT;
+      command.commandData.inputCommand.inputID = input;
+      xQueueSend(displayCommandQueue, &command, portMAX_DELAY);
     }
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }
