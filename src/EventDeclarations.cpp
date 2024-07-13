@@ -1,7 +1,7 @@
 #include "EventDeclarations.h"
 #include "globalDefines.h"
 #include "LED_Manager.h"
-#include "OLED_Manager.h"
+#include "Display_Manager.h"
 
 TaskHandle_t inputTaskHandle;
 TaskHandle_t radioReadTaskHandle;
@@ -14,7 +14,6 @@ void IRAM_ATTR button1ISR()
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
-    command.source = USER_INPUT;
     command.commandData.inputCommand.inputID = BUTTON_1;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
@@ -28,7 +27,6 @@ void IRAM_ATTR button2ISR()
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
-    command.source = USER_INPUT;
     command.commandData.inputCommand.inputID = BUTTON_2;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
@@ -42,7 +40,6 @@ void IRAM_ATTR button3ISR()
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
-    command.source = USER_INPUT;
     command.commandData.inputCommand.inputID = BUTTON_3;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
@@ -56,7 +53,6 @@ void IRAM_ATTR button4ISR()
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
-    command.source = USER_INPUT;
     command.commandData.inputCommand.inputID = BUTTON_4;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
@@ -70,7 +66,6 @@ void IRAM_ATTR buttonSOSISR()
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
-    command.source = USER_INPUT;
     command.commandData.inputCommand.inputID = BUTTON_SOS;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
@@ -97,7 +92,6 @@ void IRAM_ATTR enc_cb(void *arg)
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         DisplayCommandQueueItem command;
         command.commandType = INPUT_COMMAND;
-        command.source = USER_INPUT;
         if (currCount > prevCount)
         {
 #if DEBUG == 1
@@ -131,25 +125,25 @@ void IRAM_ATTR CompassDRDYISR()
     Navigation_Manager::read();
 }
 
-void enableInterrupts()
-{
-    attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
-    attachInterrupt(BUTTON_1_PIN, button1ISR, FALLING);
-    attachInterrupt(BUTTON_2_PIN, button2ISR, FALLING);
-    attachInterrupt(BUTTON_3_PIN, button3ISR, FALLING);
-    attachInterrupt(BUTTON_4_PIN, button4ISR, FALLING);
+// void enableInterrupts()
+// {
+//     attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
+//     attachInterrupt(BUTTON_1_PIN, button1ISR, FALLING);
+//     attachInterrupt(BUTTON_2_PIN, button2ISR, FALLING);
+//     attachInterrupt(BUTTON_3_PIN, button3ISR, FALLING);
+//     attachInterrupt(BUTTON_4_PIN, button4ISR, FALLING);
 
-    inputEncoder->attachFullQuad(ENC_A, ENC_B);
-    inputEncoder->setFilter(1023);
-}
+//     inputEncoder->attachFullQuad(ENC_A, ENC_B);
+//     inputEncoder->setFilter(1023);
+// }
 
-void disableInterrupts()
-{
-    detachInterrupt(BUTTON_1_PIN);
-    detachInterrupt(BUTTON_2_PIN);
-    detachInterrupt(BUTTON_3_PIN);
-    detachInterrupt(BUTTON_4_PIN);
-    detachInterrupt(BUTTON_SOS_PIN);
+// void disableInterrupts()
+// {
+//     detachInterrupt(BUTTON_1_PIN);
+//     detachInterrupt(BUTTON_2_PIN);
+//     detachInterrupt(BUTTON_3_PIN);
+//     detachInterrupt(BUTTON_4_PIN);
+//     detachInterrupt(BUTTON_SOS_PIN);
 
-    inputEncoder->detatch();
-}
+//     inputEncoder->detatch();
+// }

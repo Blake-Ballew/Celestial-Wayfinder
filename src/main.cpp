@@ -5,7 +5,7 @@
 #include "esp_event_base.h"
 #include "EventDeclarations.h"
 #include <ESP32Encoder.h>
-#include "OLED_Manager.h"
+#include "Display_Manager.h"
 #include "globalDefines.h"
 #include "Settings_Manager.h"
 #include "Network_Manager.h"
@@ -57,24 +57,17 @@ void setup()
   LED_Manager::init();
   Navigation_Manager::init();
   Network_Manager::init(&inputTaskHandle);
-  OLED_Manager::init();
-  System_Utils::init(&OLED_Manager::display);
+  Display_Manager::init();
+  System_Utils::init(&Display_Manager::display);
 
-  displayCommandQueue = OLED_Manager::getDisplayCommandQueue();
+  displayCommandQueue = Display_Manager::getDisplayCommandQueue();
 
-  // Register interrupt flags to inputIDs
-  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_1), BUTTON_1);
-  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_2), BUTTON_2);
-  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_3), BUTTON_3);
-  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_BUTTON_4), BUTTON_4);
-  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_ENCODER_UP), ENC_UP);
-  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_ENCODER_DOWN), ENC_DOWN);
-  OLED_Manager::registerInput(BIT_SHIFT((uint32_t)EVENT_MESSAGE_RECEIVED), MESSAGE_RECEIVED);
+  System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 8192, nullptr, 1, 0);
+  System_Utils::registerTask(Network_Manager::listenForMessages, "radioTask", 8192, nullptr, 1, 1);
 
-  xTaskCreatePinnedToCore(OLED_Manager::processCommandQueue, "displayTask", 8192, NULL, 1, &inputTaskHandle, 0);
-  xTaskCreatePinnedToCore(Network_Manager::listenForMessages, "radioTask", 8192, NULL, 1, &radioReadTaskHandle, 1);
 #if DEBUG == 1
-  xTaskCreate(sendDebugInputs, "debugInputTask", 8192, NULL, 1, &debugInputTaskHandle);
+  System_Utils::registerTask(sendDebugInputs, "debugInputTask", 8192, nullptr, 1, 1);
+  // xTaskCreate(sendDebugInputs, "debugInputTask", 8192, NULL, 1, &debugInputTaskHandle);
 #endif
 
 #if DEBUG == 1
@@ -90,31 +83,61 @@ void setup()
 
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-  attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
-  attachInterrupt(BUTTON_1_PIN, button1ISR, FALLING);
-  attachInterrupt(BUTTON_2_PIN, button2ISR, FALLING);
-  attachInterrupt(BUTTON_3_PIN, button3ISR, FALLING);
-  attachInterrupt(BUTTON_4_PIN, button4ISR, FALLING);
+  System_Utils::registerInterrupt(
+    [] {
+      attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
+    },
+    [] {
+      detachInterrupt(BUTTON_SOS_PIN);
+    });
 
-  /*vTaskDelay(5000 / portTICK_PERIOD_MS);
-  uint32_t notification;
-  notification = BIT_SHIFT((uint32_t)EVENT_BUTTON_1);
-  xTaskNotify(inputTaskHandle, notification, eSetBits);*/
+  System_Utils::registerInterrupt(
+    [] {
+      attachInterrupt(BUTTON_1_PIN, button1ISR, FALLING);
+    },
+    [] {
+      detachInterrupt(BUTTON_1_PIN);
+    });
 
-  // Network_Manager::listenForMessages(nullptr);
-  // OLED_Manager::flashDefaultSettings(uint8_t(0));
+  System_Utils::registerInterrupt(
+    [] {
+      attachInterrupt(BUTTON_2_PIN, button2ISR, FALLING);
+    },
+    [] {
+      detachInterrupt(BUTTON_2_PIN);
+    });
+
+  System_Utils::registerInterrupt(
+    [] {
+      attachInterrupt(BUTTON_3_PIN, button3ISR, FALLING);
+    },
+    [] {
+      detachInterrupt(BUTTON_3_PIN);
+    });
+
+  System_Utils::registerInterrupt(
+    [] {
+      attachInterrupt(BUTTON_4_PIN, button4ISR, FALLING);
+    },
+    [] {
+      detachInterrupt(BUTTON_4_PIN);
+    });
+
+  System_Utils::registerInterrupt(
+    [] {
+      inputEncoder->resumeCount();
+    },
+    [] {
+      inputEncoder->pauseCount();
+    });
+
+  System_Utils::enableInterrupts();
+
 }
 
 void loop()
 {
-  /*uint32_t notification;
-  vTaskDelay(3000 / portTICK_PERIOD_MS);
-  notification = BIT_SHIFT((uint32_t)EVENT_ENCODER_DOWN);
-  xTaskNotify(inputTaskHandle, notification, eSetBits);*/
-  // Serial.print("Enc A: ");
-  // Serial.print(digitalRead(ENC_A));
-  // Serial.print(" Enc B: ");
-  // Serial.println(digitalRead(ENC_B));
+
 
   vTaskDelay(60000 / portTICK_PERIOD_MS);
 }
@@ -123,24 +146,21 @@ void loop()
 // Takes in a numeric input over serial, shifts a bit by that much, and sends it to the inputTaskHandle
 void sendDebugInputs(void *pvParameters)
 {
-  uint32_t notification;
   int input;
   while (1)
   {
     if (Serial.available() > 0)
     {
       input = Serial.parseInt();
-      notification = BIT_SHIFT(input - 1);
       Serial.println();
       Serial.printf("Passing in input: %d\n", input);
       Serial.println();
       DisplayCommandQueueItem command;
       command.commandType = INPUT_COMMAND;
-      command.source = USER_INPUT;
       command.commandData.inputCommand.inputID = input;
       xQueueSend(displayCommandQueue, &command, portMAX_DELAY);
     }
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    vTaskDelay(50 / portTICK_PERIOD_MS);
   }
 }
 #endif
