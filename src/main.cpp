@@ -61,7 +61,7 @@ void setup()
   Navigation_Manager::init();
   Network_Manager::init();
   Display_Manager::init();
-  System_Utils::init(&Display_Manager::display);
+  System_Utils::init();
 
   displayCommandQueue = Display_Manager::getDisplayCommandQueue();
 
@@ -69,7 +69,7 @@ void setup()
   System_Utils::registerTask(Network_Manager::listenForMessages, "radioTask", 8192, nullptr, 1, 1);
 
 #if DEBUG == 1
-  System_Utils::registerTask(sendDebugInputs, "debugInputTask", 8192, nullptr, 1, 1);
+  System_Utils::registerTask(sendDebugInputs, "debugInputTask", 1024, nullptr, 1, 1);
   // xTaskCreate(sendDebugInputs, "debugInputTask", 8192, NULL, 1, &debugInputTaskHandle);
 #endif
 
