@@ -27,6 +27,9 @@ ESP32Encoder encoder(true, enc_cb);
 
 // esp_event_loop_handle_t loop_handle;
 
+void enableInterruptsHandler();
+void disableInterruptsHandler();
+
 void setup()
 {
 #if DEBUG == 1
@@ -56,7 +59,7 @@ void setup()
   Settings_Manager::init();
   LED_Manager::init();
   Navigation_Manager::init();
-  Network_Manager::init(&inputTaskHandle);
+  Network_Manager::init();
   Display_Manager::init();
   System_Utils::init(&Display_Manager::display);
 
@@ -83,55 +86,10 @@ void setup()
 
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-  System_Utils::registerInterrupt(
-    [] {
-      attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
-    },
-    [] {
-      detachInterrupt(BUTTON_SOS_PIN);
-    });
+  System_Utils::getEnableInterrupts() += enableInterruptsHandler;
+  System_Utils::getDisableInterrupts() += disableInterruptsHandler;
 
-  System_Utils::registerInterrupt(
-    [] {
-      attachInterrupt(BUTTON_1_PIN, button1ISR, FALLING);
-    },
-    [] {
-      detachInterrupt(BUTTON_1_PIN);
-    });
-
-  System_Utils::registerInterrupt(
-    [] {
-      attachInterrupt(BUTTON_2_PIN, button2ISR, FALLING);
-    },
-    [] {
-      detachInterrupt(BUTTON_2_PIN);
-    });
-
-  System_Utils::registerInterrupt(
-    [] {
-      attachInterrupt(BUTTON_3_PIN, button3ISR, FALLING);
-    },
-    [] {
-      detachInterrupt(BUTTON_3_PIN);
-    });
-
-  System_Utils::registerInterrupt(
-    [] {
-      attachInterrupt(BUTTON_4_PIN, button4ISR, FALLING);
-    },
-    [] {
-      detachInterrupt(BUTTON_4_PIN);
-    });
-
-  System_Utils::registerInterrupt(
-    [] {
-      inputEncoder->resumeCount();
-    },
-    [] {
-      inputEncoder->pauseCount();
-    });
-
-  System_Utils::enableInterrupts();
+  System_Utils::enableInterruptsInvoke();
 
 }
 
@@ -140,6 +98,26 @@ void loop()
 
 
   vTaskDelay(60000 / portTICK_PERIOD_MS);
+}
+
+void enableInterruptsHandler() 
+{
+  attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
+  attachInterrupt(BUTTON_1_PIN, button1ISR, FALLING);
+  attachInterrupt(BUTTON_2_PIN, button2ISR, FALLING);
+  attachInterrupt(BUTTON_3_PIN, button3ISR, FALLING);
+  attachInterrupt(BUTTON_4_PIN, button4ISR, FALLING);
+  inputEncoder->resumeCount();
+}
+
+void disableInterruptsHandler() 
+{
+  detachInterrupt(BUTTON_SOS_PIN);
+  detachInterrupt(BUTTON_1_PIN);
+  detachInterrupt(BUTTON_2_PIN);
+  detachInterrupt(BUTTON_3_PIN);
+  detachInterrupt(BUTTON_4_PIN);
+  inputEncoder->pauseCount();
 }
 
 #if DEBUG == 1
