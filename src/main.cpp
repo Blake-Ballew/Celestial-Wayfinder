@@ -21,7 +21,7 @@ TaskHandle_t debugInputTaskHandle;
 void sendDebugInputs(void *pvParameters);
 #endif
 
-#define DEBUG 1
+// #define DEBUG 1
 
 ESP32Encoder encoder(true, enc_cb);
 
@@ -57,7 +57,7 @@ void setup()
   encoder.setCount(0);
 
   Settings_Manager::init();
-  LED_Manager::init();
+  LED_Manager::init(NUM_LEDS);
   Navigation_Manager::init();
   Network_Manager::init();
   Display_Manager::init();
