@@ -63,6 +63,21 @@ void setup()
   Display_Manager::init();
   System_Utils::init();
 
+  // Initialize inputID to LED index mapping
+  std::vector<std::pair<uint8_t, uint8_t>> inputIdLedIdx = {
+    {BUTTON_1, 22},
+    {BUTTON_2, 19},
+    {BUTTON_3, 18},
+    {BUTTON_4, 17},
+    {ENC_UP, 20},
+    {ENC_DOWN, 21},
+    {BUTTON_SOS, 16},
+  };
+
+  LED_Manager::InitializeInputIdLedPins(inputIdLedIdx);
+  LED_Manager::initializeButtonFlashAnimation();
+
+
   displayCommandQueue = Display_Manager::getDisplayCommandQueue();
 
   System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 8192, nullptr, 1, 0);

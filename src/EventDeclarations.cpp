@@ -11,6 +11,12 @@ ESP32Encoder *inputEncoder;
 
 void IRAM_ATTR button1ISR()
 {
+    static TickType_t lastISRTime = 0;
+    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME)
+    {
+        return;
+    }
+
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
@@ -24,6 +30,12 @@ void IRAM_ATTR button1ISR()
 
 void IRAM_ATTR button2ISR()
 {
+    static TickType_t lastISRTime = 0;
+    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME)
+    {
+        return;
+    }
+
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
@@ -37,6 +49,12 @@ void IRAM_ATTR button2ISR()
 
 void IRAM_ATTR button3ISR()
 {
+    static TickType_t lastISRTime = 0;
+    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME)
+    {
+        return;
+    }
+
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
@@ -50,6 +68,12 @@ void IRAM_ATTR button3ISR()
 
 void IRAM_ATTR button4ISR()
 {
+    static TickType_t lastISRTime = 0;
+    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME)
+    {
+        return;
+    }
+
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
@@ -63,6 +87,12 @@ void IRAM_ATTR button4ISR()
 
 void IRAM_ATTR buttonSOSISR()
 {
+    static TickType_t lastISRTime = 0;
+    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME)
+    {
+        return;
+    }
+
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     DisplayCommandQueueItem command;
     command.commandType = INPUT_COMMAND;
@@ -89,20 +119,26 @@ void IRAM_ATTR enc_cb(void *arg)
     int64_t currCount = enc->getCount();
     if (currCount % 4 == 0)
     {
+        static TickType_t lastISRTime = 0;
+        if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME)
+        {
+            return;
+        }
+
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         DisplayCommandQueueItem command;
         command.commandType = INPUT_COMMAND;
         if (currCount > prevCount)
         {
 #if DEBUG == 1
-            Serial.println("enc_cb: down");
+            // Serial.println("enc_cb: down");
 #endif
             command.commandData.inputCommand.inputID = ENC_DOWN;
         }
         else if (currCount < prevCount)
         {
 #if DEBUG == 1
-            Serial.println("enc_cb: up");
+            // Serial.println("enc_cb: up");
 #endif
             command.commandData.inputCommand.inputID = ENC_UP;
         }
@@ -120,7 +156,7 @@ void IRAM_ATTR enc_cb(void *arg)
 void IRAM_ATTR CompassDRDYISR()
 {
 #if DEBUG == 1
-    Serial.println("CompassDRDYISR");
+    // Serial.println("CompassDRDYISR");
 #endif
     Navigation_Manager::read();
 }
