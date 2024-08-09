@@ -142,6 +142,10 @@ void IRAM_ATTR enc_cb(void *arg)
 #endif
             command.commandData.inputCommand.inputID = ENC_UP;
         }
+        else
+        {
+            return;
+        }
         prevCount = currCount;
 
         xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);

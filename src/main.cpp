@@ -9,6 +9,8 @@
 #include "globalDefines.h"
 #include "Settings_Manager.h"
 #include "Network_Manager.h"
+#include "LoraManager.h"
+#include "MessagePing.h"
 #include <FastLED.h>
 
 extern "C"
@@ -26,6 +28,15 @@ void sendDebugInputs(void *pvParameters);
 ESP32Encoder encoder(true, enc_cb);
 
 // esp_event_loop_handle_t loop_handle;
+
+// Lora Manager Radio Initialization
+#define RFM95_CS 15
+#define RFM95_Int 18
+#define RF95_TX_PWR 20
+
+RHHardwareSPI rh_spi;
+RH_RF95 driver(RFM95_CS, RFM95_Int, rh_spi);
+LoraManager<RH_RF95> loraManager(&driver, RFM95_CS, RFM95_Int, RF95_TX_PWR);
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
@@ -59,12 +70,18 @@ void setup()
   Settings_Manager::init();
   LED_Manager::init(NUM_LEDS);
   Navigation_Manager::init();
-  Network_Manager::init();
+  // Network_Manager::init();
+
+  auto success = loraManager.Init();
+
+  // TODO remove home window from here
   Display_Manager::init();
   System_Utils::init();
 
+  
+
   // Initialize inputID to LED index mapping
-  std::vector<std::pair<uint8_t, uint8_t>> inputIdLedIdx = {
+  std::unordered_map<uint8_t, uint8_t> inputIdLedIdx = {
     {BUTTON_1, 22},
     {BUTTON_2, 19},
     {BUTTON_3, 18},
@@ -74,17 +91,39 @@ void setup()
     {BUTTON_SOS, 16},
   };
 
+  Serial.println("Initializing LED pins");
   LED_Manager::InitializeInputIdLedPins(inputIdLedIdx);
   LED_Manager::initializeButtonFlashAnimation();
 
-
   displayCommandQueue = Display_Manager::getDisplayCommandQueue();
 
+  // Register message types
+  Serial.println("Registering message types");
+  MessageBase::SetMessageType(0x01);
+  MessagePing::SetMessageType(0x02);
+
+  LoraUtils::RegisterMessageDeserializer(MessageBase::MessageType(), MessageBase::MessageFactory);
+  LoraUtils::RegisterMessageDeserializer(MessagePing::MessageType(), MessagePing::MessageFactory);
+
   System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 8192, nullptr, 1, 0);
-  System_Utils::registerTask(Network_Manager::listenForMessages, "radioTask", 8192, nullptr, 1, 1);
+
+  // Bind the radio send and receive tasks and then register them
+  Serial.println("Registering radio tasks");
+  auto boundSendTask = [](void *pvParameters) {
+    LoraManager<RH_RF95> *manager = (LoraManager<RH_RF95> *)pvParameters;
+    manager->SendTask(pvParameters);
+  };
+
+  auto boundReceiveTask = [](void *pvParameters) {
+    LoraManager<RH_RF95> *manager = (LoraManager<RH_RF95> *)pvParameters;
+    manager->ReceiveTask(pvParameters);
+  };
+
+  System_Utils::registerTask(boundSendTask, "radioSend", 4096, &loraManager, 2, 1);
+  System_Utils::registerTask(boundReceiveTask, "radioReceive", 4096, &loraManager, 1, 1);
 
 #if DEBUG == 1
-  System_Utils::registerTask(sendDebugInputs, "debugInputTask", 1024, nullptr, 1, 1);
+  System_Utils::registerTask(sendDebugInputs, "debugInputTask", 1024, nullptr, 1, 0);
   // xTaskCreate(sendDebugInputs, "debugInputTask", 8192, NULL, 1, &debugInputTaskHandle);
 #endif
 
