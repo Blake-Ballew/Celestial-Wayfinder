@@ -12,6 +12,7 @@
 #include "LoraManager.h"
 #include "MessagePing.h"
 #include <FastLED.h>
+#include "CompassUtils.h"
 
 extern "C"
 {
@@ -105,7 +106,7 @@ void setup()
   LoraUtils::RegisterMessageDeserializer(MessageBase::MessageType(), MessageBase::MessageFactory);
   LoraUtils::RegisterMessageDeserializer(MessagePing::MessageType(), MessagePing::MessageFactory);
 
-  System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 8192, nullptr, 1, 0);
+  System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 1, 0);
 
   // Bind the radio send and receive tasks and then register them
   Serial.println("Registering radio tasks");
@@ -122,8 +123,10 @@ void setup()
   System_Utils::registerTask(boundSendTask, "radioSend", 4096, &loraManager, 2, 1);
   System_Utils::registerTask(boundReceiveTask, "radioReceive", 4096, &loraManager, 1, 1);
 
+  LoraUtils::MessageReceived() += CompassUtils::PassMessageReceivedToDisplay;
+
 #if DEBUG == 1
-  System_Utils::registerTask(sendDebugInputs, "debugInputTask", 1024, nullptr, 1, 0);
+  // System_Utils::registerTask(sendDebugInputs, "debugInputTask", 1024, nullptr, 1, 0);
   // xTaskCreate(sendDebugInputs, "debugInputTask", 8192, NULL, 1, &debugInputTaskHandle);
 #endif
 
@@ -196,3 +199,5 @@ void sendDebugInputs(void *pvParameters)
   }
 }
 #endif
+
+
