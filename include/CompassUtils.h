@@ -15,8 +15,17 @@ public:
     {
         if (isNew) 
         {
+            #if DEBUG == 1
+            Serial.println("CompassUtils::PassMessageReceivedToDisplay: New message received");
+            #endif
             Display_Utils::sendInputCommand(MessageReceivedInputID);
         }
+        #if DEBUG == 1
+        else
+        {
+            Serial.println("CompassUtils::PassMessageReceivedToDisplay: Old message received");
+        }
+        #endif
 
         // TODO: Maybe add refresh display command if not new
     }

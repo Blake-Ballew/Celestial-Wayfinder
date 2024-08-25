@@ -5,14 +5,16 @@
 #include "esp_event_base.h"
 #include "EventDeclarations.h"
 #include <ESP32Encoder.h>
-#include "Display_Manager.h"
 #include "globalDefines.h"
+
+#include "Display_Manager.h"
 #include "Settings_Manager.h"
-#include "Network_Manager.h"
 #include "LoraManager.h"
-#include "MessagePing.h"
-#include <FastLED.h>
+#include "NavigationManager.h"
+
 #include "CompassUtils.h"
+#include "HelperClasses/Compass/QMC5883L.h "
+#include "TinyGPS++.h"
 
 extern "C"
 {
@@ -24,7 +26,6 @@ TaskHandle_t debugInputTaskHandle;
 void sendDebugInputs(void *pvParameters);
 #endif
 
-// #define DEBUG 1
 
 ESP32Encoder encoder(true, enc_cb);
 
@@ -38,6 +39,10 @@ ESP32Encoder encoder(true, enc_cb);
 RHHardwareSPI rh_spi;
 RH_RF95 driver(RFM95_CS, RFM95_Int, rh_spi);
 LoraManager<RH_RF95> loraManager(&driver, RFM95_CS, RFM95_Int, RF95_TX_PWR);
+
+// Navigation Objects
+QMC5883L *compass;
+NavigationManager navigationManager;
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
@@ -70,8 +75,13 @@ void setup()
 
   Settings_Manager::init();
   LED_Manager::init(NUM_LEDS);
-  Navigation_Manager::init();
-  // Network_Manager::init();
+  #if DEBUG == 1
+    Serial.println("Initializing Navigation manager");
+  #endif
+  compass = new QMC5883L();
+  compass->SetInvertX(true);
+  Serial2.begin(9600);
+  navigationManager.InitializeUtils(compass, Serial2);
 
   auto success = loraManager.Init();
 

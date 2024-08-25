@@ -162,7 +162,7 @@ void IRAM_ATTR CompassDRDYISR()
 #if DEBUG == 1
     // Serial.println("CompassDRDYISR");
 #endif
-    Navigation_Manager::read();
+    // Navigation_Manager::read();
 }
 
 // void enableInterrupts()
