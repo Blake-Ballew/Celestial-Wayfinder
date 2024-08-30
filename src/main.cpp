@@ -16,6 +16,9 @@
 #include "HelperClasses/Compass/QMC5883L.h "
 #include "TinyGPS++.h"
 
+#include "ScrollWheel.h"
+#include "SolidRing.h"
+
 extern "C"
 {
 #include "bootloader_random.h"
@@ -105,6 +108,20 @@ void setup()
   Serial.println("Initializing LED pins");
   LED_Manager::InitializeInputIdLedPins(inputIdLedIdx);
   LED_Manager::initializeButtonFlashAnimation();
+
+  // Initialize other animations
+  ScrollWheel *scrollWheel = new ScrollWheel();
+  SolidRing *solidRing = new SolidRing();
+
+  LED_Utils::registerPattern(scrollWheel);
+  LED_Utils::registerPattern(solidRing);
+
+  StaticJsonDocument<128> cfg;
+  cfg["beginIdx"] = 0;
+  cfg["endIdx"] = 15;
+
+  scrollWheel->configurePattern(cfg);
+  solidRing->configurePattern(cfg);
 
   displayCommandQueue = Display_Manager::getDisplayCommandQueue();
 
