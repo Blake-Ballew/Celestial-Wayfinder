@@ -11,6 +11,7 @@
 #include "Settings_Manager.h"
 #include "LoraManager.h"
 #include "NavigationManager.h"
+#include "FilesystemManager.h"
 
 #include "CompassUtils.h"
 #include "HelperClasses/Compass/QMC5883L.h "
@@ -29,23 +30,31 @@ TaskHandle_t debugInputTaskHandle;
 void sendDebugInputs(void *pvParameters);
 #endif
 
+namespace
+{
+  const uint8_t CPU_CORE_LORA = 1;
+  const uint8_t CPU_CORE_APP = 0;
+  const uint8_t RFM95_CS = 15;
+  const uint8_t RFM95_Int = 18;
+  const uint8_t RF95_TX_PWR = 20;
+}
 
 ESP32Encoder encoder(true, enc_cb);
 
 // esp_event_loop_handle_t loop_handle;
 
-// Lora Manager Radio Initialization
-#define RFM95_CS 15
-#define RFM95_Int 18
-#define RF95_TX_PWR 20
+
 
 RHHardwareSPI rh_spi;
-RH_RF95 driver(RFM95_CS, RFM95_Int, rh_spi);
-LoraManager<RH_RF95> loraManager(&driver, RFM95_CS, RFM95_Int, RF95_TX_PWR);
+RH_RF95 CompassUtils::driver(RFM95_CS, RFM95_Int, rh_spi);
+LoraManager<RH_RF95> loraManager(&CompassUtils::driver, RFM95_CS, RFM95_Int, RF95_TX_PWR);
 
 // Navigation Objects
 QMC5883L *compass;
 NavigationManager navigationManager;
+
+// Filesytstem Manager. May not even need this
+FilesystemManager filesystemManager;
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
@@ -77,7 +86,7 @@ void setup()
   encoder.setCount(0);
 
   Settings_Manager::init();
-  LED_Manager::init(NUM_LEDS);
+  LED_Manager::init(NUM_LEDS, CPU_CORE_APP);
   #if DEBUG == 1
     Serial.println("Initializing Navigation manager");
   #endif
@@ -133,7 +142,7 @@ void setup()
   LoraUtils::RegisterMessageDeserializer(MessageBase::MessageType(), MessageBase::MessageFactory);
   LoraUtils::RegisterMessageDeserializer(MessagePing::MessageType(), MessagePing::MessageFactory);
 
-  System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 1, 0);
+  System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 1, CPU_CORE_APP);
 
   // Bind the radio send and receive tasks and then register them
   Serial.println("Registering radio tasks");
@@ -147,8 +156,8 @@ void setup()
     manager->ReceiveTask(pvParameters);
   };
 
-  System_Utils::registerTask(boundSendTask, "radioSend", 4096, &loraManager, 2, 1);
-  System_Utils::registerTask(boundReceiveTask, "radioReceive", 4096, &loraManager, 1, 1);
+  System_Utils::registerTask(boundSendTask, "radioSend", 4096, &loraManager, 1, CPU_CORE_LORA);
+  System_Utils::registerTask(boundReceiveTask, "radioReceive", 4096, &loraManager, 2, CPU_CORE_LORA);
 
   LoraUtils::MessageReceived() += CompassUtils::PassMessageReceivedToDisplay;
 
@@ -158,11 +167,7 @@ void setup()
 #endif
 
 #if DEBUG == 1
-  Settings_Manager::writeSettingsToSerial();
-  Serial.println();
-  Settings_Manager::writeMessagesToSerial();
-  Serial.println();
-  Settings_Manager::writeCoordsToSerial();
+  serializeJson(FilesystemUtils::SettingsFile(), Serial);
   Serial.println();
 #endif
 
@@ -181,7 +186,7 @@ void loop()
 {
 
 
-  vTaskDelay(60000 / portTICK_PERIOD_MS);
+  vTaskDelay(600000 / portTICK_PERIOD_MS);
 }
 
 void enableInterruptsHandler() 
