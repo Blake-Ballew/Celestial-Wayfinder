@@ -13,6 +13,7 @@
 namespace
 {
     const char *SETTINGS_FILENAME PROGMEM = "/Settings.msgpk";
+    const char *OLD_SETTINGS_FILENAME PROGMEM = "/settings.json";
 }
 
 // Static class to help interface with esp32 utils compass functionality
@@ -47,10 +48,78 @@ public:
     {   
         auto returncode = FilesystemUtils::LoadSettingsFile(SETTINGS_FILENAME);
 
+        #if DEBUG == 1
+        // Serial.print("CompassUtils::InitializeSettings: LoadSettingsFile returned ");
+        // Serial.println(returncode);
+        #endif
+
         if (returncode == FilesystemReturnCode::FILE_NOT_FOUND)
         {
-            Settings_Manager::readSettingsFromEEPROM();
+            #if DEBUG == 1
+            // Serial.println("CompassUtils::InitializeSettings: Settings file not found. Creating new settings file.");
+            #endif
             FlashSettings(0);
+
+            // Load old settings file and try to import to new settings
+            DynamicJsonDocument oldSettings(2048);
+
+            returncode = FilesystemUtils::ReadFile(OLD_SETTINGS_FILENAME, oldSettings);
+            #if DEBUG == 1
+            // Serial.print("CompassUtils::InitializeSettings: ReadFile returned ");
+            // Serial.println(returncode);
+            #endif
+
+            if (returncode == FilesystemReturnCode::FILESYSTEM_OK)
+            {
+                JsonDocument &doc = FilesystemUtils::SettingsFile();
+
+                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("UserID"))
+                {
+                    doc["UserID"] = oldSettings["User"]["UserID"].as<uint32_t>();
+                }
+
+                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Name"))
+                {
+                    doc["User Name"]["cfgVal"] = oldSettings["User"]["Name"]["cfgVal"].as<std::string>();
+                }
+
+                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Red"))
+                {
+                    doc["Theme Red"]["cfgVal"] = oldSettings["User"]["Theme Red"]["cfgVal"].as<uint8_t>();
+                }
+
+                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Green"))
+                {
+                    doc["Theme Green"]["cfgVal"] = oldSettings["User"]["Theme Green"]["cfgVal"].as<uint8_t>();
+                }
+
+                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Blue"))
+                {
+                    doc["Theme Blue"]["cfgVal"] = oldSettings["User"]["Theme Blue"]["cfgVal"].as<uint8_t>();
+                }
+          
+                if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Frequency"))
+                {
+                    doc["Frequency"]["cfgVal"] = oldSettings["Radio"]["Frequency"]["cfgVal"].as<float>();
+                }
+
+                if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Modem Config"))
+                {
+                    doc["Modem Config"]["cfgVal"] = oldSettings["Radio"]["Modem Config"]["cfgVal"].as<uint8_t>();
+                }
+
+                if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Broadcast Retries"))
+                {
+                    doc["Broadcast Attempts"]["cfgVal"] = oldSettings["Radio"]["Broadcast Retries"]["cfgVal"].as<uint8_t>();
+                }
+
+                auto writeReturnCode = FilesystemUtils::WriteSettingsFile(SETTINGS_FILENAME, doc);
+
+                #if DEBUG == 1
+                // Serial.print("CompassUtils::InitializeSettings: WriteSettingsFile returned ");
+                // Serial.println(writeReturnCode);
+                #endif
+            }
         }
 
         ProcessSettingsFile();
@@ -61,6 +130,11 @@ public:
     static void ProcessSettingsFile()
     {
         JsonDocument &doc = FilesystemUtils::SettingsFile();
+        #if DEBUG == 1
+        // Serial.println("CompassUtils::ProcessSettingsFile");
+        // serializeJson(doc, Serial);
+        // Serial.println();
+        #endif
 
         if (!doc.isNull())
         {
@@ -74,14 +148,14 @@ public:
             std::unordered_map<int, CRGB> presetThemeColors = 
             {
                 /* Custom */ {0, CRGB(red, green, blue)},
-                /* Red */ {1, CRGB(255, 0, 0)},
-                /* Green */ {2, CRGB(0, 255, 0)},
-                /* Blue */ {3, CRGB(0, 0, 255)},
-                /* Purple */ {4, CRGB(255, 0, 255)},
-                /* Yellow */ {5, CRGB(255, 255, 0)},
-                /* Cyan */ {6, CRGB(0, 255, 255)},
+                /* Red */ {1, CRGB(CRGB::HTMLColorCode::Red)},
+                /* Green */ {2, CRGB(CRGB::HTMLColorCode::Green)},
+                /* Blue */ {3, CRGB(CRGB::HTMLColorCode::Blue)},
+                /* Purple */ {4, CRGB(CRGB::HTMLColorCode::Purple)},
+                /* Yellow */ {5, CRGB(CRGB::HTMLColorCode::Yellow)},
+                /* Cyan */ {6, CRGB(CRGB::HTMLColorCode::Cyan)},
                 /* White */ {7, CRGB(255, 255, 255)},
-                /* Orange */ {8, CRGB(255, 165, 0)}
+                /* Orange */ {8, CRGB(CRGB::HTMLColorCode::Orange)},
             };
 
             CRGB color;
@@ -96,9 +170,18 @@ public:
             }
 
             LED_Utils::setThemeColor(color);
+            #if DEBUG == 1
+            // auto interfaceColor = LED_Pattern_Interface::ThemeColor();
+            // Serial.print("LED Interface::ThemeColor: ");
+            // Serial.print(interfaceColor.r);
+            // Serial.print(", ");
+            // Serial.print(interfaceColor.g);
+            // Serial.print(", ");
+            // Serial.println(interfaceColor.b);
+            #endif
 
             // Lora Module
-            LoraUtils::SetUserID(doc["UserID"]["cfgVal"].as<uint32_t>());
+            LoraUtils::SetUserID(doc["UserID"].as<uint32_t>());
             LoraUtils::SetUserName(doc["User Name"]["cfgVal"].as<std::string>());
             LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"]["cfgVal"].as<uint8_t>());
 
@@ -118,6 +201,13 @@ public:
     static void RegisterCallbacksDisplayManager(Display_Manager *unused)
     {
         Display_Manager::registerCallback(ACTION_FLASH_DEFAULT_SETTINGS, FlashSettings);
+
+        Display_Utils::UpdateDisplay() += UpdateDisplay;
+    }
+
+    static void UpdateDisplay()
+    {
+        Display_Manager::display.display();
     }
 
     // Callbacks
@@ -126,19 +216,20 @@ public:
         DynamicJsonDocument doc(2048);
         JsonDocument &oldSettings = Settings_Manager::settings;
 
-        doc["UserID"] = esp_random();
+        uint32_t userID = esp_random();
+        doc["UserID"] = userID;
+
+        // Default username is "User_xxxx" where xxxx is the last 2 bytes of the user ID in hex
+        char usernamebuffer[10];
+        sprintf(usernamebuffer, "User_%04X", userID & 0xFFFF);
+        std::string username = usernamebuffer;
 
         JsonObject User_Name = doc.createNestedObject("User Name");
         User_Name["cfgType"] = 10;
-        User_Name["cfgVal"] = "User";
-        User_Name["dftVal"] = "User";
+        User_Name["cfgVal"] = usernamebuffer;
+        User_Name["dftVal"] = usernamebuffer;
         User_Name["maxLen"] = 12;
-        doc["Silent Mode"] = true;
-
-        if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Name"))
-        {
-            User_Name["cfgVal"] = oldSettings["User"]["Name"]["cfgVal"].as<std::string>();
-        }
+        doc["Silent Mode"] = false;
 
         JsonObject Color_Theme = doc.createNestedObject("Color Theme");
         Color_Theme["cfgType"] = 11;
@@ -176,11 +267,6 @@ public:
         Theme_Red["incVal"] = 1;
         Theme_Red["signed"] = false;
 
-        if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Red"))
-        {
-            Theme_Red["cfgVal"] = oldSettings["User"]["Theme Red"]["cfgVal"].as<uint8_t>();
-        }
-
         JsonObject Theme_Green = doc.createNestedObject("Theme Green");
         Theme_Green["cfgType"] = 8;
         Theme_Green["cfgVal"] = 255;
@@ -189,11 +275,6 @@ public:
         Theme_Green["minVal"] = 0;
         Theme_Green["incVal"] = 1;
         Theme_Green["signed"] = false;
-
-        if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Green"))
-        {
-            Theme_Green["cfgVal"] = oldSettings["User"]["Theme Green"]["cfgVal"].as<uint8_t>();
-        }
 
         JsonObject Theme_Blue = doc.createNestedObject("Theme Blue");
         Theme_Blue["cfgType"] = 8;
@@ -204,11 +285,6 @@ public:
         Theme_Blue["incVal"] = 1;
         Theme_Blue["signed"] = false;
 
-        if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Blue"))
-        {
-            Theme_Blue["cfgVal"] = oldSettings["User"]["Theme Blue"]["cfgVal"].as<uint8_t>();
-        }   
-
         JsonObject Frequency = doc.createNestedObject("Frequency");
         Frequency["cfgType"] = 9;
         Frequency["cfgVal"] = 914.9;
@@ -217,20 +293,10 @@ public:
         Frequency["minVal"] = 902.3;
         Frequency["incVal"] = 0.2;
 
-        if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Frequency"))
-        {
-            Frequency["cfgVal"] = oldSettings["Radio"]["Frequency"]["cfgVal"].as<float>();
-        }
-
         JsonObject Modem_Config = doc.createNestedObject("Modem Config");
         Modem_Config["cfgType"] = 11;
         Modem_Config["cfgVal"] = 4;
         Modem_Config["dftVal"] = 4;
-
-        if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Modem Config"))
-        {
-            Modem_Config["cfgVal"] = oldSettings["Radio"]["Modem Config"]["cfgVal"].as<uint8_t>();
-        }
 
         JsonArray Modem_Config_vals = Modem_Config.createNestedArray("vals");
         Modem_Config_vals.add(0);
@@ -255,13 +321,20 @@ public:
         Broadcast_Attempts["incVal"] = 1;
         Broadcast_Attempts["signed"] = false;
 
-        if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Broadcast Retries"))
-        {
-            Broadcast_Attempts["cfgVal"] = oldSettings["Radio"]["Broadcast Retries"]["cfgVal"].as<uint8_t>();
-        }
-
         doc["24H Time"] = false;
 
-        FilesystemUtils::WriteSettingsFile(SETTINGS_FILENAME, doc);
+        auto returncode = FilesystemUtils::WriteSettingsFile(SETTINGS_FILENAME, doc);
+        #if DEBUG == 1
+        Serial.print("CompassUtils::FlashSettings: ");
+        Serial.println(returncode);
+        #endif  
+
+        if (inputID != 0)
+        {
+            Display_Utils::clearDisplay();
+            Display_Utils::printCenteredText("Settings Flashed!");
+            Display_Utils::UpdateDisplay().Invoke();
+            vTaskDelay(pdMS_TO_TICKS(2000));
+        }
     }
 };

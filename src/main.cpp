@@ -19,6 +19,8 @@
 
 #include "ScrollWheel.h"
 #include "SolidRing.h"
+#include "RingPoint.h"
+#include "Illuminate_Button.h"
 
 extern "C"
 {
@@ -85,20 +87,27 @@ void setup()
   encoder.setFilter(1023);
   encoder.setCount(0);
 
-  Settings_Manager::init();
+  // Initialize Filesystem and settings
+  filesystemManager.Init();
+  CompassUtils::InitializeSettings();
+
+  // Initialize LED Module
   LED_Manager::init(NUM_LEDS, CPU_CORE_APP);
-  #if DEBUG == 1
-    Serial.println("Initializing Navigation manager");
-  #endif
+
+  // Intialize Navigation Module
   compass = new QMC5883L();
   compass->SetInvertX(true);
   Serial2.begin(9600);
   navigationManager.InitializeUtils(compass, Serial2);
 
+  // Initialize Lora Module
   auto success = loraManager.Init();
+  
 
   // TODO remove home window from here
   Display_Manager::init();
+  CompassUtils::RegisterCallbacksDisplayManager(nullptr);
+
   System_Utils::init();
 
   
@@ -121,9 +130,13 @@ void setup()
   // Initialize other animations
   ScrollWheel *scrollWheel = new ScrollWheel();
   SolidRing *solidRing = new SolidRing();
+  RingPoint *ringPoint = new RingPoint();
+  Illuminate_Button *IlluminateButton = new Illuminate_Button(inputIdLedIdx);
 
   LED_Utils::registerPattern(scrollWheel);
   LED_Utils::registerPattern(solidRing);
+  LED_Utils::registerPattern(ringPoint);
+  LED_Utils::registerPattern(IlluminateButton);
 
   StaticJsonDocument<128> cfg;
   cfg["beginIdx"] = 0;
@@ -131,6 +144,7 @@ void setup()
 
   scrollWheel->configurePattern(cfg);
   solidRing->configurePattern(cfg);
+  ringPoint->configurePattern(cfg);
 
   displayCommandQueue = Display_Manager::getDisplayCommandQueue();
 
@@ -142,7 +156,7 @@ void setup()
   LoraUtils::RegisterMessageDeserializer(MessageBase::MessageType(), MessageBase::MessageFactory);
   LoraUtils::RegisterMessageDeserializer(MessagePing::MessageType(), MessagePing::MessageFactory);
 
-  System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 1, CPU_CORE_APP);
+  System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 2, CPU_CORE_APP);
 
   // Bind the radio send and receive tasks and then register them
   Serial.println("Registering radio tasks");
@@ -184,8 +198,6 @@ void setup()
 
 void loop()
 {
-
-
   vTaskDelay(600000 / portTICK_PERIOD_MS);
 }
 
