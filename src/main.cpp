@@ -21,6 +21,7 @@
 #include "SolidRing.h"
 #include "RingPoint.h"
 #include "Illuminate_Button.h"
+#include "Ring_Pulse.h"
 
 extern "C"
 {
@@ -132,11 +133,13 @@ void setup()
   SolidRing *solidRing = new SolidRing();
   RingPoint *ringPoint = new RingPoint();
   Illuminate_Button *IlluminateButton = new Illuminate_Button(inputIdLedIdx);
+  Ring_Pulse *ringPulse = new Ring_Pulse();
 
   LED_Utils::registerPattern(scrollWheel);
   LED_Utils::registerPattern(solidRing);
   LED_Utils::registerPattern(ringPoint);
   LED_Utils::registerPattern(IlluminateButton);
+  LED_Utils::registerPattern(ringPulse);
 
   StaticJsonDocument<128> cfg;
   cfg["beginIdx"] = 0;
@@ -145,6 +148,7 @@ void setup()
   scrollWheel->configurePattern(cfg);
   solidRing->configurePattern(cfg);
   ringPoint->configurePattern(cfg);
+  ringPulse->configurePattern(cfg);
 
   displayCommandQueue = Display_Manager::getDisplayCommandQueue();
 
