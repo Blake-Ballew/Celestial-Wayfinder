@@ -103,7 +103,13 @@ void setup()
 
   // Initialize Lora Module
   auto success = loraManager.Init();
-  
+
+#if DEBUG == 1
+  if (!success)
+  {
+    Serial.println("Failed to initialize Lora module");
+  }
+#endif
 
   // TODO remove home window from here
   Display_Manager::init();

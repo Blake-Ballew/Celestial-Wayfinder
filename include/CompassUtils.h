@@ -44,6 +44,7 @@ public:
         // TODO: Maybe add refresh display command if not new
     }
 
+
     static void InitializeSettings()
     {   
         auto returncode = FilesystemUtils::LoadSettingsFile(SETTINGS_FILENAME);
@@ -186,11 +187,23 @@ public:
             LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"]["cfgVal"].as<uint8_t>());
 
             float frequency = doc["Frequency"]["cfgVal"].as<float>();
-            driver.setFrequency(frequency);
+            if (!driver.setFrequency(frequency))
+            {
+                #if DEBUG == 1
+                Serial.println("CompassUtils::ProcessSettingsFile: setFrequency failed");
+                #endif
+            }
 
             auto modemConfigIndex = doc["Modem Config"]["cfgVal"].as<size_t>();
-            RH_RF95::ModemConfigChoice modemConfig = (RH_RF95::ModemConfigChoice)doc["Modem Config"]["vals"][modemConfigIndex].as<int>();
-            driver.setModemConfig(modemConfig);
+            RH_RF95::ModemConfigChoice modemConfig = (RH_RF95::ModemConfigChoice)doc["Modem Config"]["vals"][modemConfigIndex].as<size_t>();
+            if (!driver.setModemConfig(modemConfig))
+            {
+                #if DEBUG == 1
+                Serial.println("CompassUtils::ProcessSettingsFile: setModemConfig failed");
+                #endif
+            }
+
+            driver.setTxPower(20);
 
             // System
             System_Utils::silentMode = doc["Silent Mode"].as<bool>();
