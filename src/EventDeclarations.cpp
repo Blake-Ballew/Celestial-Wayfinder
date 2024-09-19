@@ -11,6 +11,7 @@ ESP32Encoder *inputEncoder;
 
 void IRAM_ATTR button1ISR()
 {
+    Serial.println("button1ISR");
     static TickType_t lastISRTime = 0;
     if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_BUTTONS)
     {
@@ -140,17 +141,21 @@ void IRAM_ATTR enc_cb(void *arg)
         command.commandType = INPUT_COMMAND;
         if (currCount > prevCount)
         {
-#if DEBUG == 1
-            // Serial.println("enc_cb: down");
-#endif
+            #if HARDWARE_VERSION == 1
             command.commandData.inputCommand.inputID = ENC_DOWN;
+            #endif
+            #if HARDWARE_VERSION == 2
+            command.commandData.inputCommand.inputID = ENC_UP;
+            #endif
         }
         else if (currCount < prevCount)
         {
-#if DEBUG == 1
-            // Serial.println("enc_cb: up");
-#endif
+            #if HARDWARE_VERSION == 1
             command.commandData.inputCommand.inputID = ENC_UP;
+            #endif
+            #if HARDWARE_VERSION == 2
+            command.commandData.inputCommand.inputID = ENC_DOWN;
+            #endif
         }
         else
         {

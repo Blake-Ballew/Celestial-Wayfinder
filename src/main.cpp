@@ -14,7 +14,9 @@
 #include "FilesystemManager.h"
 
 #include "CompassUtils.h"
-#include "HelperClasses/Compass/QMC5883L.h "
+#include "HelperClasses/Compass/QMC5883L.h"
+#include "HelperClasses/Compass/LSM303AGR.h"
+
 #include "TinyGPS++.h"
 
 #include "ScrollWheel.h"
@@ -53,7 +55,7 @@ RH_RF95 CompassUtils::driver(RFM95_CS, RFM95_Int, rh_spi);
 LoraManager<RH_RF95> loraManager(&CompassUtils::driver, RFM95_CS, RFM95_Int, RF95_TX_PWR);
 
 // Navigation Objects
-QMC5883L *compass;
+CompassInterface *compass;
 NavigationManager navigationManager;
 
 // Filesytstem Manager. May not even need this
@@ -66,7 +68,8 @@ void setup()
 {
 #if DEBUG == 1
   Serial.begin(115200);
-  Serial.println("Initializing");
+  Serial.print("Initializing Hardware Version ");
+  Serial.println(HARDWARE_VERSION);
 #endif
 
   bootloader_random_enable();
@@ -74,15 +77,17 @@ void setup()
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
   pinMode(BUTTON_SOS_PIN, INPUT_PULLUP);
-  pinMode(BUTTON_1_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_1_PIN, INPUT);
   pinMode(BUTTON_2_PIN, INPUT_PULLUP);
   pinMode(BUTTON_3_PIN, INPUT_PULLUP);
   pinMode(BUTTON_4_PIN, INPUT);
-  pinMode(KEEP_ALIVE_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(BATT_SENSE_PIN, INPUT);
 
+#if HARDWARE_VERSION == 1
+  pinMode(KEEP_ALIVE_PIN, OUTPUT);  
   digitalWrite(KEEP_ALIVE_PIN, HIGH);
+#endif
 
   encoder.attachFullQuad(ENC_A, ENC_B);
   encoder.setFilter(1023);
@@ -96,8 +101,27 @@ void setup()
   LED_Manager::init(NUM_LEDS, CPU_CORE_APP);
 
   // Intialize Navigation Module
-  compass = new QMC5883L();
-  compass->SetInvertX(true);
+  // Initialize Compass
+#if HARDWARE_VERSION == 1
+#if DEBUG == 1
+  Serial.println("Using QMC5883L");
+#endif
+  QMC5883L *QMC5883Lcompass = new QMC5883L();
+  QMC5883Lcompass->SetInvertX(true);
+
+  compass = QMC5883Lcompass;
+#endif
+#if HARDWARE_VERSION == 2
+#if DEBUG == 1
+  Serial.println("Using LSM303AGR");
+#endif
+  compass = new LSM303AGR();
+#endif
+
+  #if DEBUG == 1
+  Serial.println("Initializing Navigation Manager");
+  #endif
+  // Initialize GPS Stream
   Serial2.begin(9600);
   navigationManager.InitializeUtils(compass, Serial2);
 
@@ -116,8 +140,6 @@ void setup()
   CompassUtils::RegisterCallbacksDisplayManager(nullptr);
 
   System_Utils::init();
-
-  
 
   // Initialize inputID to LED index mapping
   std::unordered_map<uint8_t, uint8_t> inputIdLedIdx = {

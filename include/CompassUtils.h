@@ -50,14 +50,14 @@ public:
         auto returncode = FilesystemUtils::LoadSettingsFile(SETTINGS_FILENAME);
 
         #if DEBUG == 1
-        // Serial.print("CompassUtils::InitializeSettings: LoadSettingsFile returned ");
-        // Serial.println(returncode);
+        Serial.print("CompassUtils::InitializeSettings: LoadSettingsFile returned ");
+        Serial.println(returncode);
         #endif
 
         if (returncode == FilesystemReturnCode::FILE_NOT_FOUND)
         {
             #if DEBUG == 1
-            // Serial.println("CompassUtils::InitializeSettings: Settings file not found. Creating new settings file.");
+            Serial.println("CompassUtils::InitializeSettings: Settings file not found. Creating new settings file.");
             #endif
             FlashSettings(0);
 
@@ -66,8 +66,8 @@ public:
 
             returncode = FilesystemUtils::ReadFile(OLD_SETTINGS_FILENAME, oldSettings);
             #if DEBUG == 1
-            // Serial.print("CompassUtils::InitializeSettings: ReadFile returned ");
-            // Serial.println(returncode);
+            Serial.print("CompassUtils::InitializeSettings: ReadFile returned ");
+            Serial.println(returncode);
             #endif
 
             if (returncode == FilesystemReturnCode::FILESYSTEM_OK)
@@ -117,11 +117,15 @@ public:
                 auto writeReturnCode = FilesystemUtils::WriteSettingsFile(SETTINGS_FILENAME, doc);
 
                 #if DEBUG == 1
-                // Serial.print("CompassUtils::InitializeSettings: WriteSettingsFile returned ");
-                // Serial.println(writeReturnCode);
+                Serial.print("CompassUtils::InitializeSettings: WriteSettingsFile returned ");
+                Serial.println(writeReturnCode);
                 #endif
             }
         }
+
+        #if DEBUG == 1
+        Serial.println("CompassUtils::InitializeSettings: Done");
+        #endif
 
         ProcessSettingsFile();
 
@@ -132,9 +136,9 @@ public:
     {
         JsonDocument &doc = FilesystemUtils::SettingsFile();
         #if DEBUG == 1
-        // Serial.println("CompassUtils::ProcessSettingsFile");
-        // serializeJson(doc, Serial);
-        // Serial.println();
+        Serial.println("CompassUtils::ProcessSettingsFile");
+        serializeJson(doc, Serial);
+        Serial.println();
         #endif
 
         if (!doc.isNull())
@@ -172,13 +176,13 @@ public:
 
             LED_Utils::setThemeColor(color);
             #if DEBUG == 1
-            // auto interfaceColor = LED_Pattern_Interface::ThemeColor();
-            // Serial.print("LED Interface::ThemeColor: ");
-            // Serial.print(interfaceColor.r);
-            // Serial.print(", ");
-            // Serial.print(interfaceColor.g);
-            // Serial.print(", ");
-            // Serial.println(interfaceColor.b);
+            auto interfaceColor = LED_Pattern_Interface::ThemeColor();
+            Serial.print("LED Interface::ThemeColor: ");
+            Serial.print(interfaceColor.r);
+            Serial.print(", ");
+            Serial.print(interfaceColor.g);
+            Serial.print(", ");
+            Serial.println(interfaceColor.b);
             #endif
 
             // Lora Module
@@ -208,6 +212,10 @@ public:
             // System
             System_Utils::silentMode = doc["Silent Mode"].as<bool>();
             System_Utils::time24Hour = doc["24H Time"].as<bool>();
+
+            #if DEBUG == 1
+            Serial.println("CompassUtils::ProcessSettingsFile: Done");
+            #endif
         }
     }
 
@@ -308,8 +316,8 @@ public:
 
         JsonObject Modem_Config = doc.createNestedObject("Modem Config");
         Modem_Config["cfgType"] = 11;
-        Modem_Config["cfgVal"] = 4;
-        Modem_Config["dftVal"] = 4;
+        Modem_Config["cfgVal"] = 1;
+        Modem_Config["dftVal"] = 1 ;
 
         JsonArray Modem_Config_vals = Modem_Config.createNestedArray("vals");
         Modem_Config_vals.add(0);
