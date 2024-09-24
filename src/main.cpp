@@ -52,7 +52,7 @@ ESP32Encoder encoder(true, enc_cb);
 
 RHHardwareSPI rh_spi;
 RH_RF95 CompassUtils::driver(RFM95_CS, RFM95_Int, rh_spi);
-LoraManager<RH_RF95> loraManager(&CompassUtils::driver, RFM95_CS, RFM95_Int, RF95_TX_PWR);
+LoraManager loraManager(&CompassUtils::driver, RFM95_CS, RFM95_Int, RF95_TX_PWR);
 
 // Navigation Objects
 CompassInterface *compass;
@@ -77,7 +77,7 @@ void setup()
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
   pinMode(BUTTON_SOS_PIN, INPUT_PULLUP);
-  pinMode(BUTTON_1_PIN, INPUT);
+  pinMode(BUTTON_1_PIN, INPUT_PULLUP);
   pinMode(BUTTON_2_PIN, INPUT_PULLUP);
   pinMode(BUTTON_3_PIN, INPUT_PULLUP);
   pinMode(BUTTON_4_PIN, INPUT);
@@ -193,23 +193,43 @@ void setup()
   // Bind the radio send and receive tasks and then register them
   Serial.println("Registering radio tasks");
   auto boundSendTask = [](void *pvParameters) {
-    LoraManager<RH_RF95> *manager = (LoraManager<RH_RF95> *)pvParameters;
+    LoraManager *manager = (LoraManager *)pvParameters;
     manager->SendTask(pvParameters);
   };
 
   auto boundReceiveTask = [](void *pvParameters) {
-    LoraManager<RH_RF95> *manager = (LoraManager<RH_RF95> *)pvParameters;
+    LoraManager *manager = (LoraManager *)pvParameters;
     manager->ReceiveTask(pvParameters);
   };
 
-  System_Utils::registerTask(boundSendTask, "radioSend", 4096, &loraManager, 1, CPU_CORE_LORA);
-  System_Utils::registerTask(boundReceiveTask, "radioReceive", 4096, &loraManager, 2, CPU_CORE_LORA);
+  int sendTaskID = System_Utils::registerTask(boundSendTask, "radioSend", 4096, &loraManager, 1, CPU_CORE_LORA);
+  int receiveTaskID = System_Utils::registerTask(boundReceiveTask, "radioReceive", 4096, &loraManager, 2, CPU_CORE_LORA);
+
+  loraManager.SetTaskHandles(System_Utils::getTask(sendTaskID),
+                             System_Utils::getTask(receiveTaskID));
 
   LoraUtils::MessageReceived() += CompassUtils::PassMessageReceivedToDisplay;
 
+  // Register edits for Lora
+  
+  // CompassUtils::driver.spiWrite(0x1F, 0xFF); //increase RX timeout
+
+  #if HARDWARE_VERSION == 2
+  CompassUtils::driver.spiWrite(0x0B, 0x0B);
+  CompassUtils::driver.spiWrite(0x0C, 0x20);
+  CompassUtils::driver.spiWrite(0x22, 0x52);
+  CompassUtils::driver.spiWrite(0x0D, 0x52);
+  CompassUtils::driver.spiWrite(0x1F, 0x64);
+  #endif
+
 #if DEBUG == 1
-  // System_Utils::registerTask(sendDebugInputs, "debugInputTask", 1024, nullptr, 1, 0);
-  // xTaskCreate(sendDebugInputs, "debugInputTask", 8192, NULL, 1, &debugInputTaskHandle);
+  for (int i = 0; i <= 0x39; i++)
+  {
+    Serial.print("0x");
+    Serial.print(i, HEX);
+    Serial.print(": 0x");
+    Serial.println(CompassUtils::driver.spiRead(i), HEX);
+  }
 #endif
 
 #if DEBUG == 1

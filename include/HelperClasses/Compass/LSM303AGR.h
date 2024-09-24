@@ -6,6 +6,13 @@
 #include <Adafruit_LIS2MDL.h>
 #include <Adafruit_LSM303_Accel.h>
 
+struct Vector
+{
+    float x;
+    float y;
+    float z;
+};
+
 // Reads magnetometer to compute azimuth with z correction from accelerometer
 class LSM303AGR : public CompassInterface
 {
@@ -42,6 +49,9 @@ public:
         sensors_event_t magEvent;
         sensors_event_t accelEvent;
 
+        Vector mag;
+        Vector accel;
+
         _CompassMagnetometer.getEvent(&magEvent);
         _CompassAccelerometer.getEvent(&accelEvent);
 
@@ -60,9 +70,17 @@ public:
         float Ay = accelEvent.acceleration.y;
         float Az = accelEvent.acceleration.z;
 
-        float azimuth = getTiltCompensatedAzimuth(Mx, My, Mz, Ax, Ay, Az);
+        mag.x = Mx;
+        mag.y = My;
+        mag.z = Mz;
 
-        return azimuth;
+        accel.x = Ax;
+        accel.y = Ay;
+        accel.z = Az;
+
+        float azimuth = GetHeading(mag, accel);
+
+        return 360.0f - azimuth;
     }
 
     void PrintRawValues()
@@ -195,5 +213,46 @@ protected:
         }
 
         return azimuth;
+    }
+
+    float GetHeading(Vector &mag, Vector &accel)
+    {
+        Vector from = {1, 0, 0};
+        Vector east;
+        Vector north;
+
+        VectorCross(mag, accel, east);
+        VectorNormalize(east);
+
+        VectorCross(accel, east, north);
+        VectorNormalize(north);
+
+        float heading = atan2(VectorDot(east, from), VectorDot(north, from)) * (180.0 / M_PI);
+        if (heading < 0)
+        {
+            heading += 360.0;
+        }
+
+        return heading;
+    }
+
+    void VectorCross(const Vector &a, const Vector &b, Vector &result)
+    {
+        result.x = a.y * b.z - a.z * b.y;
+        result.y = a.z * b.x - a.x * b.z;
+        result.z = a.x * b.y - a.y * b.x;
+    }
+
+    float VectorDot(const Vector &a, const Vector &b)
+    {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    void VectorNormalize(Vector &v)
+    {
+        float length = sqrt(VectorDot(v, v));
+        v.x /= length;
+        v.y /= length;
+        v.z /= length;
     }
 };

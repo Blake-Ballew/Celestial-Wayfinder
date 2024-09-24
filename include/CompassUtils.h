@@ -207,7 +207,13 @@ public:
                 #endif
             }
 
+            #if HARDWARE_VERSION == 1
             driver.setTxPower(20);
+            #endif
+
+            #if HARDWARE_VERSION == 2
+            driver.setTxPower(23);
+            #endif
 
             // System
             System_Utils::silentMode = doc["Silent Mode"].as<bool>();
