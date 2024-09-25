@@ -1,12 +1,14 @@
 #pragma once
 
 #include "Display_Utils.h"
-#include "LoraUtils.h"
+#include "LoraManager.h"
 #include "FilesystemUtils.h"
 #include "LED_Utils.h"
 #include "Settings_Manager.h"
 #include "Display_Manager.h"
-#include "RH_RF95.h"
+
+#include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
+
 #include "ArduinoJson.h"
 #include "globalDefines.h"
 
@@ -23,7 +25,7 @@ class CompassUtils
 public:
 
     static uint8_t MessageReceivedInputID;
-    static RH_RF95 driver;
+    static ArduinoLoRaDriver ArduinoLora;
 
     static void PassMessageReceivedToDisplay(uint32_t sendingUserID, bool isNew)
     {
@@ -191,28 +193,16 @@ public:
             LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"]["cfgVal"].as<uint8_t>());
 
             float frequency = doc["Frequency"]["cfgVal"].as<float>();
-            if (!driver.setFrequency(frequency))
-            {
-                #if DEBUG == 1
-                Serial.println("CompassUtils::ProcessSettingsFile: setFrequency failed");
-                #endif
-            }
-
-            auto modemConfigIndex = doc["Modem Config"]["cfgVal"].as<size_t>();
-            RH_RF95::ModemConfigChoice modemConfig = (RH_RF95::ModemConfigChoice)doc["Modem Config"]["vals"][modemConfigIndex].as<size_t>();
-            if (!driver.setModemConfig(modemConfig))
-            {
-                #if DEBUG == 1
-                Serial.println("CompassUtils::ProcessSettingsFile: setModemConfig failed");
-                #endif
-            }
+            // ArduinoLora.SetFrequency(frequency);
+            ArduinoLora.SetSpreadingFactor(7);
+            ArduinoLora.SetSignalBandwidth(125E3);
 
             #if HARDWARE_VERSION == 1
-            driver.setTxPower(20);
+            ArduinoLora.SetTXPower(20);
             #endif
 
             #if HARDWARE_VERSION == 2
-            driver.setTxPower(23);
+            ArduinoLora.SetTXPower(23);
             #endif
 
             // System
@@ -363,5 +353,17 @@ public:
             Display_Utils::UpdateDisplay().Invoke();
             vTaskDelay(pdMS_TO_TICKS(2000));
         }
+    }
+
+    static void BoundRadioTask(void *pvParameters)
+    {
+        LoraManager *manager = (LoraManager *)pvParameters;
+        manager->RadioTask();
+    }
+
+    static void BoundSendQueueTask(void *pvParameters)
+    {
+        LoraManager *manager = (LoraManager *)pvParameters;
+        manager->SendQueueTask();
     }
 };

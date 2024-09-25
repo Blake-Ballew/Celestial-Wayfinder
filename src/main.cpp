@@ -14,6 +14,7 @@
 #include "FilesystemManager.h"
 
 #include "CompassUtils.h"
+
 #include "HelperClasses/Compass/QMC5883L.h"
 #include "HelperClasses/Compass/LSM303AGR.h"
 
@@ -39,20 +40,17 @@ namespace
 {
   const uint8_t CPU_CORE_LORA = 1;
   const uint8_t CPU_CORE_APP = 0;
-  const uint8_t RFM95_CS = 15;
-  const uint8_t RFM95_Int = 18;
+  const uint8_t LORA_CS = 15;
+  const uint8_t LORA_RST = -1;
+  const uint8_t LORA_DIO0 = 18;
   const uint8_t RF95_TX_PWR = 20;
 }
 
 ESP32Encoder encoder(true, enc_cb);
 
-// esp_event_loop_handle_t loop_handle;
-
-
-
-RHHardwareSPI rh_spi;
-RH_RF95 CompassUtils::driver(RFM95_CS, RFM95_Int, rh_spi);
-LoraManager loraManager(&CompassUtils::driver, RFM95_CS, RFM95_Int, RF95_TX_PWR);
+SPIClass loraSpi(HSPI);
+ArduinoLoRaDriver CompassUtils::ArduinoLora(&loraSpi, LORA_CS, LORA_RST, LORA_DIO0, 915E6);
+LoraManager loraManager(&CompassUtils::ArduinoLora);
 
 // Navigation Objects
 CompassInterface *compass;
@@ -192,21 +190,9 @@ void setup()
 
   // Bind the radio send and receive tasks and then register them
   Serial.println("Registering radio tasks");
-  auto boundSendTask = [](void *pvParameters) {
-    LoraManager *manager = (LoraManager *)pvParameters;
-    manager->SendTask(pvParameters);
-  };
 
-  auto boundReceiveTask = [](void *pvParameters) {
-    LoraManager *manager = (LoraManager *)pvParameters;
-    manager->ReceiveTask(pvParameters);
-  };
-
-  int sendTaskID = System_Utils::registerTask(boundSendTask, "radioSend", 4096, &loraManager, 1, CPU_CORE_LORA);
-  int receiveTaskID = System_Utils::registerTask(boundReceiveTask, "radioReceive", 4096, &loraManager, 2, CPU_CORE_LORA);
-
-  loraManager.SetTaskHandles(System_Utils::getTask(sendTaskID),
-                             System_Utils::getTask(receiveTaskID));
+  int radioTaskID = System_Utils::registerTask(CompassUtils::BoundRadioTask, "radio-task", 4096, &loraManager, 2, CPU_CORE_LORA);
+  int sendQueueTaskID = System_Utils::registerTask(CompassUtils::BoundSendQueueTask, "send-queue-task", 4096, &loraManager, 1, CPU_CORE_LORA);
 
   LoraUtils::MessageReceived() += CompassUtils::PassMessageReceivedToDisplay;
 
@@ -215,25 +201,25 @@ void setup()
   // CompassUtils::driver.spiWrite(0x1F, 0xFF); //increase RX timeout
 
   #if HARDWARE_VERSION == 2
-  CompassUtils::driver.spiWrite(0x0B, 0x0B);
-  CompassUtils::driver.spiWrite(0x0C, 0x20);
-  CompassUtils::driver.spiWrite(0x22, 0x52);
-  CompassUtils::driver.spiWrite(0x0D, 0x52);
-  CompassUtils::driver.spiWrite(0x1F, 0x64);
+  // CompassUtils::driver.spiWrite(0x0B, 0x0B);
+  // CompassUtils::driver.spiWrite(0x0C, 0x20);
+  // CompassUtils::driver.spiWrite(0x22, 0x52);
+  // CompassUtils::driver.spiWrite(0x0D, 0x52);
+  // CompassUtils::driver.spiWrite(0x1F, 0x64);
   #endif
 
 #if DEBUG == 1
   for (int i = 0; i <= 0x39; i++)
   {
-    Serial.print("0x");
-    Serial.print(i, HEX);
-    Serial.print(": 0x");
-    Serial.println(CompassUtils::driver.spiRead(i), HEX);
+    // Serial.print("0x");
+    // Serial.print(i, HEX);
+    // Serial.print(": 0x");
+    // Serial.println(CompassUtils::driver.spiRead(i), HEX);
   }
 #endif
 
 #if DEBUG == 1
-  serializeJson(FilesystemUtils::SettingsFile(), Serial);
+  FilesystemUtils::PrintSettingsFile();
   Serial.println();
 #endif
 
