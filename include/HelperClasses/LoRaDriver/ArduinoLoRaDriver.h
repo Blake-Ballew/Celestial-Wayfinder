@@ -111,21 +111,9 @@ public:
         // serializeMsgPack(doc, buffer, sizeof(buffer));
 
         #if DEBUG == 1
-        // Serial.print("Sending message of size ");
-        // Serial.print(msgSize);
-        // Serial.print(": ");
-        // {
-        //     StaticJsonDocument<256> doc2;
-        //     deserializeMsgPack(doc2, buffer, sizeof(buffer));
-        //     serializeJson(doc2, Serial);
-        // }
-        // Serial.println();
-        // for (auto i = 0; i < sizeof(buffer); i++)
-        // {
-        //     Serial.print(buffer[i], HEX);
-        //     Serial.print(" ");
-        // }
-        // Serial.println();
+        Serial.print("Sending message: ");
+        serializeJson(doc, Serial);
+        Serial.println();
         #endif
 
         if (LoRa.beginPacket())
