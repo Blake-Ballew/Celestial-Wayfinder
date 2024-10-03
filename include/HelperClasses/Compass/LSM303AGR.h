@@ -6,6 +6,11 @@
 #include <Adafruit_LIS2MDL.h>
 #include <Adafruit_LSM303_Accel.h>
 
+namespace
+{
+    const float AZIMUTH_OFFSET = -90.0f;
+};
+
 struct Vector
 {
     float x;
@@ -228,6 +233,7 @@ protected:
         VectorNormalize(north);
 
         float heading = atan2(VectorDot(east, from), VectorDot(north, from)) * (180.0 / M_PI);
+        heading += AZIMUTH_OFFSET;
         if (heading < 0)
         {
             heading += 360.0;

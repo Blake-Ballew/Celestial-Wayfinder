@@ -51,6 +51,7 @@ public:
         }
         #endif
 
+        LoRa.setCodingRate4(8);
         LoRa.setSpreadingFactor(7);
         LoRa.setSignalBandwidth(125E3);
         LoRa.setSPIFrequency(_spiFrequency);
@@ -78,15 +79,15 @@ public:
             if (msgSize == 0) continue;
 
             #if DEBUG == 1
-            Serial.print("Message of length ");
-            Serial.print(msgSize);
-            Serial.print(" received: ");
-            for (auto i = 0; i < msgSize; i++)
-            {
-                Serial.print(buffer[i], HEX);
-                Serial.print(" ");
-            }
-            Serial.println();
+            // Serial.print("Message of length ");
+            // Serial.print(msgSize);
+            // Serial.print(" received: ");
+            // for (auto i = 0; i < msgSize; i++)
+            // {
+            //     Serial.print(buffer[i], HEX);
+            //     Serial.print(" ");
+            // }
+            // Serial.println();
             #endif
 
             auto result = deserializeMsgPack(doc, (const uint8_t *)buffer, sizeof(buffer));
