@@ -232,6 +232,11 @@ void setup()
 
   System_Utils::enableInterruptsInvoke();
 
+  try {
+    System_Utils::enableWiFi();
+  } catch (const std::exception& e) {
+    // Serial.println(e.what());
+  }
 }
 
 void loop()

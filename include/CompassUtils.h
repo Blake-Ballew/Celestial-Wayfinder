@@ -35,6 +35,12 @@ public:
             Serial.println("CompassUtils::PassMessageReceivedToDisplay: New message received");
             #endif
             Display_Utils::sendInputCommand(MessageReceivedInputID);
+            
+            MessageBase *msg = LoraUtils::GetCurrentUnreadMessage();
+            if (msg != nullptr)
+            {
+                System_Utils::sendWifiMessage();
+            }
         }
         #if DEBUG == 1
         else
