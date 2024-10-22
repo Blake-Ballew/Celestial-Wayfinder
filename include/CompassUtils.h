@@ -218,6 +218,10 @@ public:
     static void RegisterCallbacksDisplayManager(Display_Manager *unused)
     {
         Display_Manager::registerCallback(ACTION_FLASH_DEFAULT_SETTINGS, FlashSettings);
+        Display_Manager::registerCallback(ACTION_FLASH_LOCATIONS, FlashCampLocations);
+        Display_Manager::registerCallback(ACTION_FLASH_MESSAGES, FlashMessages);
+        Display_Manager::registerCallback(ACTION_CLEAR_LOCATIONS, ClearLocations);
+        Display_Manager::registerCallback(ACTION_CLEAR_MESSAGES, ClearMessages);
 
         Display_Utils::UpdateDisplay() += UpdateDisplay;
     }
@@ -353,6 +357,53 @@ public:
             Display_Utils::UpdateDisplay().Invoke();
             vTaskDelay(pdMS_TO_TICKS(2000));
         }
+    }
+
+    static void FlashCampLocations(uint8_t inputID)
+    {
+        Display_Utils::clearDisplay();
+        Display_Utils::printCenteredText("Flashing Locations...");
+        Display_Utils::UpdateDisplay().Invoke();
+
+        // No defaut locations exist currently
+
+        Display_Utils::clearDisplay();
+        Display_Utils:: printCenteredText("Locations Flashed!");
+        Display_Utils::UpdateDisplay().Invoke();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+
+    static void FlashImportantLocations(uint8_t inputID)
+    {
+
+    }
+
+    static void FlashMessages(uint8_t inputID)
+    {
+        Display_Utils::clearDisplay();
+        Display_Utils::printCenteredText("Flashing Messages...");
+        Display_Utils::UpdateDisplay().Invoke();
+
+
+        LoraUtils::AddSavedMessage("Meet here", false);
+        LoraUtils::AddSavedMessage("Point of Interest", false);
+        LoraUtils::AddSavedMessage("Avoid here", true);
+
+
+        Display_Utils::clearDisplay();
+        Display_Utils:: printCenteredText("Messages Flashed!");
+        Display_Utils::UpdateDisplay().Invoke();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+
+    static void ClearLocations(uint8_t inputID)
+    {
+        NavigationUtils::ClearSavedLocations();
+    }
+
+    static void ClearMessages(uint8_t inputID)
+    {
+        LoraUtils::ClearSavedMessages();
     }
 
     static void BoundRadioTask(void *pvParameters)
