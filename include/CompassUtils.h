@@ -3,6 +3,7 @@
 #include "Display_Utils.h"
 #include "LoraManager.h"
 #include "FilesystemUtils.h"
+#include "RpcUtils.h"
 #include "LED_Utils.h"
 #include "Settings_Manager.h"
 #include "Display_Manager.h"
@@ -224,6 +225,29 @@ public:
         Display_Manager::registerCallback(ACTION_CLEAR_MESSAGES, ClearMessages);
 
         Display_Utils::UpdateDisplay() += UpdateDisplay;
+    }
+
+    static void RegisterRpcFunctions()
+    {
+        // Saved Locations
+        RpcModule::Utilities::RegisterRpc("AddSavedLocation", NavigationUtils::RpcAddSavedLocation);
+        RpcModule::Utilities::RegisterRpc("AddSavedLocations", NavigationUtils::RpcAddSavedLocations);
+        RpcModule::Utilities::RegisterRpc("RemoveSavedLocation", NavigationUtils::RpcRemoveSavedLocation);
+        RpcModule::Utilities::RegisterRpc("ClearSavedLocations", NavigationUtils::RpcClearSavedLocations);
+        RpcModule::Utilities::RegisterRpc("UpdateSavedLocation", NavigationUtils::RpcUpdateSavedLocation);
+        RpcModule::Utilities::RegisterRpc("GetSavedLocation", NavigationUtils::RpcGetSavedLocation);
+        RpcModule::Utilities::RegisterRpc("GetSavedLocations", NavigationUtils::RpcGetSavedLocations);
+
+        // Saved Messages
+        RpcModule::Utilities::RegisterRpc("AddSavedMessage", LoraUtils::RpcAddSavedMessage);
+        RpcModule::Utilities::RegisterRpc("AddSavedMessages", LoraUtils::RpcAddSavedMessages);
+        RpcModule::Utilities::RegisterRpc("DeleteSavedMessage", LoraUtils::RpcDeleteSavedMessage);
+        RpcModule::Utilities::RegisterRpc("DeleteSavedMessages", LoraUtils::RpcDeleteSavedMessages);
+        RpcModule::Utilities::RegisterRpc("GetSavedMessage", LoraUtils::RpcGetSavedMessage);
+        RpcModule::Utilities::RegisterRpc("GetSavedMessages", LoraUtils::RpcGetSavedMessages);
+        RpcModule::Utilities::RegisterRpc("UpdateSavedMessage", LoraUtils::RpcUpdateSavedMessage);
+
+        
     }
 
     static void UpdateDisplay()
