@@ -196,6 +196,9 @@ void setup()
 
   LoraUtils::MessageReceived() += CompassUtils::PassMessageReceivedToDisplay;
 
+  // Initialize RPC
+  CompassUtils::InitializeRpc();
+
   // Register edits for Lora
   
   // CompassUtils::driver.spiWrite(0x1F, 0xFF); //increase RX timeout

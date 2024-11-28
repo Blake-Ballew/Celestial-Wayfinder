@@ -7,6 +7,7 @@
 #include "LED_Utils.h"
 #include "Settings_Manager.h"
 #include "Display_Manager.h"
+#include "RpcManager.h"
 
 #include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
 
@@ -17,6 +18,7 @@ namespace
 {
     const char *SETTINGS_FILENAME PROGMEM = "/Settings.msgpk";
     const char *OLD_SETTINGS_FILENAME PROGMEM = "/settings.json";
+    static RpcModule::Manager RpcManagerInstance;
 }
 
 // Static class to help interface with esp32 utils compass functionality
@@ -227,6 +229,11 @@ public:
         Display_Utils::UpdateDisplay() += UpdateDisplay;
     }
 
+    static void InitializeRpc()
+    {
+        RpcManagerInstance.Init(5);
+    }
+
     static void RegisterRpcFunctions()
     {
         // Saved Locations
@@ -392,7 +399,7 @@ public:
         // No defaut locations exist currently
 
         Display_Utils::clearDisplay();
-        Display_Utils:: printCenteredText("Locations Flashed!");
+        Display_Utils::printCenteredText("Locations Flashed!");
         Display_Utils::UpdateDisplay().Invoke();
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
