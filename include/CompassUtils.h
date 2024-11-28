@@ -232,6 +232,8 @@ public:
     static void InitializeRpc()
     {
         RpcManagerInstance.Init(1);
+
+        RegisterRpcFunctions();
     }
 
     static void RegisterRpcFunctions()
