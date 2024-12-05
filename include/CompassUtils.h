@@ -229,9 +229,9 @@ public:
         Display_Utils::UpdateDisplay() += UpdateDisplay;
     }
 
-    static void InitializeRpc()
+    static void InitializeRpc(size_t rpcTaskPriority, size_t rpcTaskCore)
     {
-        RpcManagerInstance.Init(1);
+        RpcManagerInstance.Init(rpcTaskPriority, rpcTaskCore);
 
         RegisterRpcFunctions();
     }

@@ -191,13 +191,13 @@ void setup()
   // Bind the radio send and receive tasks and then register them
   Serial.println("Registering radio tasks");
 
-  int radioTaskID = System_Utils::registerTask(CompassUtils::BoundRadioTask, "radio-task", 4096, &loraManager, 2, CPU_CORE_LORA);
-  int sendQueueTaskID = System_Utils::registerTask(CompassUtils::BoundSendQueueTask, "send-queue-task", 4096, &loraManager, 1, CPU_CORE_LORA);
+  int radioTaskID = System_Utils::registerTask(CompassUtils::BoundRadioTask, "radio-task", 4096, &loraManager, 3, CPU_CORE_LORA);
+  int sendQueueTaskID = System_Utils::registerTask(CompassUtils::BoundSendQueueTask, "send-queue-task", 4096, &loraManager, 2, CPU_CORE_LORA);
 
   LoraUtils::MessageReceived() += CompassUtils::PassMessageReceivedToDisplay;
 
   // Initialize RPC
-  CompassUtils::InitializeRpc();
+  CompassUtils::InitializeRpc(1, CPU_CORE_LORA);
 
   // Register edits for Lora
   
@@ -222,8 +222,8 @@ void setup()
 #endif
 
 #if DEBUG == 1
-  FilesystemUtils::PrintSettingsFile();
-  Serial.println();
+  // FilesystemUtils::PrintSettingsFile();
+  // Serial.println();
 #endif
 
   inputEncoder = &encoder;
