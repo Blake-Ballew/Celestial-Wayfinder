@@ -8,6 +8,7 @@
 #include "Settings_Manager.h"
 #include "Display_Manager.h"
 #include "RpcManager.h"
+#include "NetworkUtils.h"
 
 #include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
 
@@ -19,6 +20,7 @@ namespace
     const char *SETTINGS_FILENAME PROGMEM = "/Settings.msgpk";
     const char *OLD_SETTINGS_FILENAME PROGMEM = "/settings.json";
     static RpcModule::Manager RpcManagerInstance;
+    static AsyncWebServer WebServerInstance(80);
 }
 
 // Static class to help interface with esp32 utils compass functionality
@@ -52,32 +54,34 @@ public:
 
     static void InitializeSettings()
     {   
-        auto returncode = FilesystemUtils::LoadSettingsFile(SETTINGS_FILENAME);
+        // DynamicJsonDocument settings(2048);
+        // FilesystemModule::Utilities::SettingsFileName() = SETTINGS_FILENAME;
+        auto returncode = FilesystemModule::Utilities::LoadSettingsFile(FilesystemModule::Utilities::SettingsFile());
 
-        #if DEBUG == 1
+#if DEBUG == 1
         Serial.print("CompassUtils::InitializeSettings: LoadSettingsFile returned ");
         Serial.println(returncode);
-        #endif
+#endif
 
-        if (returncode == FilesystemReturnCode::FILE_NOT_FOUND)
+        if (returncode == FilesystemModule::FilesystemReturnCode::FILE_NOT_FOUND)
         {
-            #if DEBUG == 1
+#if DEBUG == 1
             Serial.println("CompassUtils::InitializeSettings: Settings file not found. Creating new settings file.");
-            #endif
+#endif
             FlashSettings(0);
 
             // Load old settings file and try to import to new settings
             DynamicJsonDocument oldSettings(2048);
 
-            returncode = FilesystemUtils::ReadFile(OLD_SETTINGS_FILENAME, oldSettings);
+            returncode = FilesystemModule::Utilities::ReadFile(OLD_SETTINGS_FILENAME, oldSettings);
             #if DEBUG == 1
             Serial.print("CompassUtils::InitializeSettings: ReadFile returned ");
             Serial.println(returncode);
             #endif
 
-            if (returncode == FilesystemReturnCode::FILESYSTEM_OK)
+            if (returncode == FilesystemModule::FilesystemReturnCode::FILESYSTEM_OK)
             {
-                JsonDocument &doc = FilesystemUtils::SettingsFile();
+                JsonDocument &doc = FilesystemModule::Utilities::SettingsFile();
 
                 if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("UserID"))
                 {
@@ -119,7 +123,7 @@ public:
                     doc["Broadcast Attempts"]["cfgVal"] = oldSettings["Radio"]["Broadcast Retries"]["cfgVal"].as<uint8_t>();
                 }
 
-                auto writeReturnCode = FilesystemUtils::WriteSettingsFile(SETTINGS_FILENAME, doc);
+                auto writeReturnCode = FilesystemModule::Utilities::WriteSettingsFile(SETTINGS_FILENAME, doc);
 
                 #if DEBUG == 1
                 Serial.print("CompassUtils::InitializeSettings: WriteSettingsFile returned ");
@@ -129,21 +133,24 @@ public:
         }
 
         #if DEBUG == 1
-        Serial.println("CompassUtils::InitializeSettings: Done");
+        Serial.println("Settings File: ");
+        serializeJsonPretty(FilesystemModule::Utilities::SettingsFile(), Serial);
+        Serial.println();
         #endif
 
-        ProcessSettingsFile();
+        ProcessSettingsFile(FilesystemModule::Utilities::SettingsFile());
 
-        FilesystemUtils::SettingsUpdated() += ProcessSettingsFile;
+        FilesystemModule::Utilities::SettingsUpdated() += ProcessSettingsFile;
+        FilesystemModule::Utilities::SettingsUpdated() += System_Utils::UpdateSettings;
     }
 
-    static void ProcessSettingsFile()
+    static void ProcessSettingsFile(JsonDocument &doc)
     {
-        JsonDocument &doc = FilesystemUtils::SettingsFile();
+        // JsonDocument &doc = FilesystemModule::Utilities::SettingsFile();
         #if DEBUG == 1
-        Serial.println("CompassUtils::ProcessSettingsFile");
-        serializeJson(doc, Serial);
-        Serial.println();
+        // Serial.println("CompassUtils::ProcessSettingsFile");
+        // serializeJson(doc, Serial);
+        // Serial.println();
         #endif
 
         if (!doc.isNull())
@@ -232,6 +239,9 @@ public:
     static void InitializeRpc(size_t rpcTaskPriority, size_t rpcTaskCore)
     {
         RpcManagerInstance.Init(rpcTaskPriority, rpcTaskCore);
+        RpcManagerInstance.RegisterWebServerRpc(WebServerInstance);
+
+        WiFi.onEvent(EnableServerOnWiFiConnected);
 
         RegisterRpcFunctions();
     }
@@ -241,7 +251,7 @@ public:
         // Saved Locations
         RpcModule::Utilities::RegisterRpc("AddSavedLocation", NavigationUtils::RpcAddSavedLocation);
         RpcModule::Utilities::RegisterRpc("AddSavedLocations", NavigationUtils::RpcAddSavedLocations);
-        RpcModule::Utilities::RegisterRpc("RemoveSavedLocation", NavigationUtils::RpcRemoveSavedLocation);
+        RpcModule::Utilities::RegisterRpc("DeleteSavedLocation", NavigationUtils::RpcRemoveSavedLocation);
         RpcModule::Utilities::RegisterRpc("ClearSavedLocations", NavigationUtils::RpcClearSavedLocations);
         RpcModule::Utilities::RegisterRpc("UpdateSavedLocation", NavigationUtils::RpcUpdateSavedLocation);
         RpcModule::Utilities::RegisterRpc("GetSavedLocation", NavigationUtils::RpcGetSavedLocation);
@@ -256,7 +266,10 @@ public:
         RpcModule::Utilities::RegisterRpc("GetSavedMessages", LoraUtils::RpcGetSavedMessages);
         RpcModule::Utilities::RegisterRpc("UpdateSavedMessage", LoraUtils::RpcUpdateSavedMessage);
 
-        
+        // Settings
+        RpcModule::Utilities::RegisterRpc("GetSettings", FilesystemModule::Utilities::RpcGetSettingsFile);
+        RpcModule::Utilities::RegisterRpc("UpdateSetting", FilesystemModule::Utilities::RpcUpdateSetting);
+        RpcModule::Utilities::RegisterRpc("UpdateSettings", FilesystemModule::Utilities::RpcUpdateSettings);
     }
 
     static void UpdateDisplay()
@@ -377,7 +390,7 @@ public:
 
         doc["24H Time"] = false;
 
-        auto returncode = FilesystemUtils::WriteSettingsFile(SETTINGS_FILENAME, doc);
+        auto returncode = FilesystemModule::Utilities::WriteSettingsFile(SETTINGS_FILENAME, doc);
         #if DEBUG == 1
         Serial.print("CompassUtils::FlashSettings: ");
         Serial.println(returncode);
@@ -449,5 +462,20 @@ public:
     {
         LoraManager *manager = (LoraManager *)pvParameters;
         manager->SendQueueTask();
+    }
+
+    private:
+    static void EnableServerOnWiFiConnected(WiFiEvent_t event, WiFiEventInfo_t info)
+    {
+        if(event == SYSTEM_EVENT_STA_GOT_IP) 
+        {
+            // Start server now that Wi-Fi is ready
+            WebServerInstance.begin();
+        } 
+        else if(event == SYSTEM_EVENT_STA_DISCONNECTED) 
+        {
+            // Optionally, you could stop the server if you like:
+            // server.end();
+        }
     }
 };

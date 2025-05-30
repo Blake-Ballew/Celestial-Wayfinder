@@ -57,7 +57,7 @@ CompassInterface *compass;
 NavigationManager navigationManager;
 
 // Filesytstem Manager. May not even need this
-FilesystemManager filesystemManager;
+FilesystemModule::Manager filesystemManager;
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
@@ -92,7 +92,7 @@ void setup()
   encoder.setCount(0);
 
   // Initialize Filesystem and settings
-  filesystemManager.Init();
+  filesystemManager.InitializeFilesystem();
   CompassUtils::InitializeSettings();
 
   // Initialize LED Module
