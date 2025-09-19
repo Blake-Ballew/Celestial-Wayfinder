@@ -63,85 +63,216 @@ public:
         Serial.println(returncode);
 #endif
 
-        if (returncode == FilesystemModule::FilesystemReturnCode::FILE_NOT_FOUND)
-        {
-#if DEBUG == 1
-            Serial.println("CompassUtils::InitializeSettings: Settings file not found. Creating new settings file.");
-#endif
-            FlashSettings(0);
+        // CheckSettingsFile(FilesystemModule::Utilities::SettingsFile());
 
-            // Load old settings file and try to import to new settings
-            DynamicJsonDocument oldSettings(2048);
+        FilesystemModule::Utilities::SettingsUpdated() += CheckSettingsFile;
+        FilesystemModule::Utilities::SettingsUpdated() += ProcessSettingsFile;
+        FilesystemModule::Utilities::SettingsUpdated() += System_Utils::UpdateSettings;
 
-            returncode = FilesystemModule::Utilities::ReadFile(OLD_SETTINGS_FILENAME, oldSettings);
-            #if DEBUG == 1
-            Serial.print("CompassUtils::InitializeSettings: ReadFile returned ");
-            Serial.println(returncode);
-            #endif
-
-            if (returncode == FilesystemModule::FilesystemReturnCode::FILESYSTEM_OK)
-            {
-                JsonDocument &doc = FilesystemModule::Utilities::SettingsFile();
-
-                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("UserID"))
-                {
-                    doc["UserID"] = oldSettings["User"]["UserID"].as<uint32_t>();
-                }
-
-                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Name"))
-                {
-                    doc["User Name"]["cfgVal"] = oldSettings["User"]["Name"]["cfgVal"].as<std::string>();
-                }
-
-                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Red"))
-                {
-                    doc["Theme Red"]["cfgVal"] = oldSettings["User"]["Theme Red"]["cfgVal"].as<uint8_t>();
-                }
-
-                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Green"))
-                {
-                    doc["Theme Green"]["cfgVal"] = oldSettings["User"]["Theme Green"]["cfgVal"].as<uint8_t>();
-                }
-
-                if (oldSettings.containsKey("User") && oldSettings["User"].containsKey("Theme Blue"))
-                {
-                    doc["Theme Blue"]["cfgVal"] = oldSettings["User"]["Theme Blue"]["cfgVal"].as<uint8_t>();
-                }
-          
-                if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Frequency"))
-                {
-                    doc["Frequency"]["cfgVal"] = oldSettings["Radio"]["Frequency"]["cfgVal"].as<float>();
-                }
-
-                if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Modem Config"))
-                {
-                    doc["Modem Config"]["cfgVal"] = oldSettings["Radio"]["Modem Config"]["cfgVal"].as<uint8_t>();
-                }
-
-                if (oldSettings.containsKey("Radio") && oldSettings["Radio"].containsKey("Broadcast Retries"))
-                {
-                    doc["Broadcast Attempts"]["cfgVal"] = oldSettings["Radio"]["Broadcast Retries"]["cfgVal"].as<uint8_t>();
-                }
-
-                auto writeReturnCode = FilesystemModule::Utilities::WriteSettingsFile(SETTINGS_FILENAME, doc);
-
-                #if DEBUG == 1
-                Serial.print("CompassUtils::InitializeSettings: WriteSettingsFile returned ");
-                Serial.println(writeReturnCode);
-                #endif
-            }
-        }
+        FilesystemModule::Utilities::SettingsUpdated().Invoke(FilesystemModule::Utilities::SettingsFile());
 
         #if DEBUG == 1
         Serial.println("Settings File: ");
         serializeJsonPretty(FilesystemModule::Utilities::SettingsFile(), Serial);
         Serial.println();
         #endif
+    }
 
-        ProcessSettingsFile(FilesystemModule::Utilities::SettingsFile());
+    static void CheckSettingsFile(JsonDocument &doc)
+    {
+        bool updateSettings = false;
 
-        FilesystemModule::Utilities::SettingsUpdated() += ProcessSettingsFile;
-        FilesystemModule::Utilities::SettingsUpdated() += System_Utils::UpdateSettings;
+        if (!doc.containsKey("UserID"))
+        {
+            doc["UserID"] = esp_random();
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("User Name"))
+        {
+            char usernamebuffer[10];
+            sprintf(usernamebuffer, "User_%04X", doc["UserID"].as<uint32_t>() & 0xFFFF);
+            std::string username = usernamebuffer;
+
+            JsonObject User_Name = doc.createNestedObject("User Name");
+            User_Name["cfgType"] = 10;
+            User_Name["cfgVal"] = usernamebuffer;
+            User_Name["dftVal"] = usernamebuffer;
+            User_Name["maxLen"] = 12;
+            doc["Silent Mode"] = false;
+
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Device Name"))
+        {
+            char devicenamebuffer[21];
+            sprintf(devicenamebuffer, "Beacon_%04X", doc["UserID"].as<uint32_t>() & 0xFFFFFFFF);
+            std::string deviceName = devicenamebuffer;
+
+            JsonObject Device_Name = doc.createNestedObject("Device Name");
+            Device_Name["cfgType"] = 10;
+            Device_Name["cfgVal"] = deviceName;
+            Device_Name["dftVal"] = deviceName;
+            Device_Name["maxLen"] = 20;
+            doc["Silent Mode"] = false;
+
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Color Theme"))
+        {
+            JsonObject Color_Theme = doc.createNestedObject("Color Theme");
+            Color_Theme["cfgType"] = 11;
+            Color_Theme["cfgVal"] = 0;
+            Color_Theme["dftVal"] = 0;
+
+            JsonArray Color_Theme_vals = Color_Theme.createNestedArray("vals");
+            Color_Theme_vals.add(0);
+            Color_Theme_vals.add(1);
+            Color_Theme_vals.add(2);
+            Color_Theme_vals.add(3);
+            Color_Theme_vals.add(4);
+            Color_Theme_vals.add(5);
+            Color_Theme_vals.add(6);
+            Color_Theme_vals.add(7);
+            Color_Theme_vals.add(8);
+
+            JsonArray Color_Theme_valTxt = Color_Theme.createNestedArray("valTxt");
+            Color_Theme_valTxt.add("Custom");
+            Color_Theme_valTxt.add("Red");
+            Color_Theme_valTxt.add("Green");
+            Color_Theme_valTxt.add("Blue");
+            Color_Theme_valTxt.add("Purple");
+            Color_Theme_valTxt.add("Yellow");
+            Color_Theme_valTxt.add("Cyan");
+            Color_Theme_valTxt.add("White");
+            Color_Theme_valTxt.add("Orange");
+
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Theme Red"))
+        {
+            JsonObject Theme_Red = doc.createNestedObject("Theme Red");
+            Theme_Red["cfgType"] = 8;
+            Theme_Red["cfgVal"] = 0;
+            Theme_Red["dftVal"] = 0;
+            Theme_Red["maxVal"] = 255;
+            Theme_Red["minVal"] = 0;
+            Theme_Red["incVal"] = 1;
+            Theme_Red["signed"] = false;
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Theme Green"))
+        {
+            JsonObject Theme_Green = doc.createNestedObject("Theme Green");
+            Theme_Green["cfgType"] = 8;
+            Theme_Green["cfgVal"] = 0;
+            Theme_Green["dftVal"] = 0;
+            Theme_Green["maxVal"] = 255;
+            Theme_Green["minVal"] = 0;
+            Theme_Green["incVal"] = 1;
+            Theme_Green["signed"] = false;
+            updateSettings = true;
+        } 
+
+        if (!doc.containsKey("Theme Blue"))
+        {
+            JsonObject Theme_Blue = doc.createNestedObject("Theme Blue");
+            Theme_Blue["cfgType"] = 8;
+            Theme_Blue["cfgVal"] = 0;
+            Theme_Blue["dftVal"] = 0;
+            Theme_Blue["maxVal"] = 255;
+            Theme_Blue["minVal"] = 0;
+            Theme_Blue["incVal"] = 1;
+            Theme_Blue["signed"] = false;
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Frequency"))
+        {
+            JsonObject Frequency = doc.createNestedObject("Frequency");
+            Frequency["cfgType"] = 9;
+            Frequency["cfgVal"] = 914.9;
+            Frequency["dftVal"] = 914.9;
+            Frequency["maxVal"] = 914.9;
+            Frequency["minVal"] = 902.3;
+            Frequency["incVal"] = 0.2;
+
+            updateSettings = true;
+        }
+        
+        if (!doc.containsKey("Modem Config"))
+        {
+            JsonObject Modem_Config = doc.createNestedObject("Modem Config");
+            Modem_Config["cfgType"] = 11;
+            Modem_Config["cfgVal"] = 1;
+            Modem_Config["dftVal"] = 1 ;
+
+            JsonArray Modem_Config_vals = Modem_Config.createNestedArray("vals");
+            Modem_Config_vals.add(0);
+            Modem_Config_vals.add(1);
+            Modem_Config_vals.add(2);
+            Modem_Config_vals.add(3);
+            Modem_Config_vals.add(4);
+
+            JsonArray Modem_Config_valTxt = Modem_Config.createNestedArray("valTxt");
+            Modem_Config_valTxt.add("125 kHz, 4/5, 128");
+            Modem_Config_valTxt.add("500 kHz, 4/5, 128");
+            Modem_Config_valTxt.add("31.25 kHz, 4/8, 512");
+            Modem_Config_valTxt.add("125 kHz, 4/8, 4096");
+            Modem_Config_valTxt.add("125 khz, 4/5, 2048");
+
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Broadcast Attempts"))
+        {
+            JsonObject Broadcast_Attempts = doc.createNestedObject("Broadcast Attempts");
+            Broadcast_Attempts["cfgType"] = 8;
+            Broadcast_Attempts["cfgVal"] = 3;
+            Broadcast_Attempts["dftVal"] = 3;
+            Broadcast_Attempts["maxVal"] = 5;
+            Broadcast_Attempts["minVal"] = 1;
+            Broadcast_Attempts["incVal"] = 1;
+            Broadcast_Attempts["signed"] = false;
+
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Silent Mode"))
+        {
+            doc["Silent Mode"] = false;
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("24H Time"))
+        {
+            doc["24H Time"] = false;    
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Firmware Version") || doc["Firmware Version"].as<std::string>() != std::string(FIRMWARE_VERSION_STRING))
+        {
+            doc["Firmware Version"] = FIRMWARE_VERSION_STRING;
+            updateSettings = true;
+        }
+
+        if (!doc.containsKey("Hardware Version") || doc["Hardware Version"].as<int>() != HARDWARE_VERSION)
+        {
+            doc["Hardware Version"] = HARDWARE_VERSION;
+            updateSettings = true;
+        }
+
+        if (updateSettings)
+        {
+            #if DEBUG == 1
+            Serial.println("CompassUtils::FlashSettings: Updating settings file.");
+            #endif
+            FilesystemModule::Utilities::WriteFile(FilesystemModule::Utilities::SettingsFileName(), doc);
+        }
     }
 
     static void ProcessSettingsFile(JsonDocument &doc)
@@ -227,11 +358,11 @@ public:
 
     static void RegisterCallbacksDisplayManager(Display_Manager *unused)
     {
-        Display_Manager::registerCallback(ACTION_FLASH_DEFAULT_SETTINGS, FlashSettings);
-        Display_Manager::registerCallback(ACTION_FLASH_LOCATIONS, FlashCampLocations);
-        Display_Manager::registerCallback(ACTION_FLASH_MESSAGES, FlashMessages);
-        Display_Manager::registerCallback(ACTION_CLEAR_LOCATIONS, ClearLocations);
-        Display_Manager::registerCallback(ACTION_CLEAR_MESSAGES, ClearMessages);
+        // Display_Manager::registerCallback(ACTION_FLASH_DEFAULT_SETTINGS, FlashSettings);
+        // Display_Manager::registerCallback(ACTION_FLASH_LOCATIONS, FlashCampLocations);
+        // Display_Manager::registerCallback(ACTION_FLASH_MESSAGES, FlashMessages);
+        // Display_Manager::registerCallback(ACTION_CLEAR_LOCATIONS, ClearLocations);
+        // Display_Manager::registerCallback(ACTION_CLEAR_MESSAGES, ClearMessages);
 
         Display_Utils::UpdateDisplay() += UpdateDisplay;
     }
@@ -239,7 +370,7 @@ public:
     static void InitializeRpc(size_t rpcTaskPriority, size_t rpcTaskCore)
     {
         RpcManagerInstance.Init(rpcTaskPriority, rpcTaskCore);
-        RpcManagerInstance.RegisterWebServerRpc(WebServerInstance);
+        RpcManagerInstance.RegisterWebServerRpc(WebServerInstance); 
 
         WiFi.onEvent(EnableServerOnWiFiConnected);
 
@@ -270,6 +401,14 @@ public:
         RpcModule::Utilities::RegisterRpc("GetSettings", FilesystemModule::Utilities::RpcGetSettingsFile);
         RpcModule::Utilities::RegisterRpc("UpdateSetting", FilesystemModule::Utilities::RpcUpdateSetting);
         RpcModule::Utilities::RegisterRpc("UpdateSettings", FilesystemModule::Utilities::RpcUpdateSettings);
+
+        // OTA
+        RpcModule::Utilities::RegisterRpc("BeginOTA", System_Utils::StartOtaRpc);
+        RpcModule::Utilities::RegisterRpc("UploadOTAChunk", System_Utils::UploadOtaChunkRpc);
+        RpcModule::Utilities::RegisterRpc("EndOTA", System_Utils::EndOtaRpc);
+
+        // System
+        RpcModule::Utilities::RegisterRpc("RestartSystem", [](JsonDocument &_) { ESP.restart();  vTaskDelay(1000 / portTICK_PERIOD_MS); });
     }
 
     static void UpdateDisplay()
@@ -405,25 +544,6 @@ public:
         }
     }
 
-    static void FlashCampLocations(uint8_t inputID)
-    {
-        Display_Utils::clearDisplay();
-        Display_Utils::printCenteredText("Flashing Locations...");
-        Display_Utils::UpdateDisplay().Invoke();
-
-        // No defaut locations exist currently
-
-        Display_Utils::clearDisplay();
-        Display_Utils::printCenteredText("Locations Flashed!");
-        Display_Utils::UpdateDisplay().Invoke();
-        vTaskDelay(pdMS_TO_TICKS(2000));
-    }
-
-    static void FlashImportantLocations(uint8_t inputID)
-    {
-
-    }
-
     static void FlashMessages(uint8_t inputID)
     {
         Display_Utils::clearDisplay();
@@ -431,9 +551,7 @@ public:
         Display_Utils::UpdateDisplay().Invoke();
 
 
-        LoraUtils::AddSavedMessage("Meet here", false);
-        LoraUtils::AddSavedMessage("Point of Interest", false);
-        LoraUtils::AddSavedMessage("Avoid here", true);
+        LoraUtils::AddSavedMessage("Ping", false);
 
 
         Display_Utils::clearDisplay();
