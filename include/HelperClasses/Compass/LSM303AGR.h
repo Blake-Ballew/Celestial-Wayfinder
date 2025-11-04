@@ -24,11 +24,24 @@ class LSM303AGR : public CompassInterface
 public:
     LSM303AGR()
     {
+        if (!Wire.available()) 
+        {
+            #if DEBUG == 1
+            Serial.println("Compass LSM303AGR::LSM303AGR: Initializing Wire");
+            #endif
+        }
+        else
+        {
+            #if DEBUG == 1
+            Serial.println("Compass LSM303AGR::LSM303AGR: Wire already initialized");
+            #endif
+        }
+
         #if DEBUG == 1
         Serial.println("Compass LSM303AGR::LSM303AGR: Initializing");
         #endif
 
-        if (!_CompassMagnetometer.begin())
+        if (!_CompassMagnetometer.begin(0x1E, &Wire))
         {
             Serial.println("Compass LSM303AGR::LSM303AGR: Magnetometer not found");
         }

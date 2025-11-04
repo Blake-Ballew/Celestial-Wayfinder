@@ -6,6 +6,7 @@
 #include "RpcUtils.h"
 #include "LED_Utils.h"
 #include "Settings_Manager.h"
+#include "EspNowManager.h"
 #include "Display_Manager.h"
 #include "RpcManager.h"
 #include "NetworkUtils.h"
@@ -20,6 +21,7 @@ namespace
     const char *SETTINGS_FILENAME PROGMEM = "/Settings.msgpk";
     const char *OLD_SETTINGS_FILENAME PROGMEM = "/settings.json";
     static RpcModule::Manager RpcManagerInstance;
+    static ConnectivityModule::EspNowManager EspNowManagerInstance;
     static AsyncWebServer WebServerInstance(80);
 }
 
@@ -67,6 +69,7 @@ public:
 
         FilesystemModule::Utilities::SettingsUpdated() += CheckSettingsFile;
         FilesystemModule::Utilities::SettingsUpdated() += ProcessSettingsFile;
+        FilesystemModule::Utilities::SettingsUpdated() += ConnectivityModule::Utilities::ProcessSettings;
         FilesystemModule::Utilities::SettingsUpdated() += System_Utils::UpdateSettings;
 
         FilesystemModule::Utilities::SettingsUpdated().Invoke(FilesystemModule::Utilities::SettingsFile());
@@ -107,7 +110,7 @@ public:
         if (!doc.containsKey("Device Name"))
         {
             char devicenamebuffer[21];
-            sprintf(devicenamebuffer, "Beacon_%04X", doc["UserID"].as<uint32_t>() & 0xFFFFFFFF);
+            sprintf(devicenamebuffer, "Beacon_%04X", doc["UserID"].as<uint32_t>() & 0xFFFF);
             std::string deviceName = devicenamebuffer;
 
             JsonObject Device_Name = doc.createNestedObject("Device Name");
@@ -124,8 +127,8 @@ public:
         {
             JsonObject Color_Theme = doc.createNestedObject("Color Theme");
             Color_Theme["cfgType"] = 11;
-            Color_Theme["cfgVal"] = 0;
-            Color_Theme["dftVal"] = 0;
+            Color_Theme["cfgVal"] = 2;
+            Color_Theme["dftVal"] = 2;
 
             JsonArray Color_Theme_vals = Color_Theme.createNestedArray("vals");
             Color_Theme_vals.add(0);
@@ -169,8 +172,8 @@ public:
         {
             JsonObject Theme_Green = doc.createNestedObject("Theme Green");
             Theme_Green["cfgType"] = 8;
-            Theme_Green["cfgVal"] = 0;
-            Theme_Green["dftVal"] = 0;
+            Theme_Green["cfgVal"] = 255;
+            Theme_Green["dftVal"] = 255;
             Theme_Green["maxVal"] = 255;
             Theme_Green["minVal"] = 0;
             Theme_Green["incVal"] = 1;
@@ -254,6 +257,26 @@ public:
             updateSettings = true;
         }
 
+        if (!doc.containsKey("WiFi Provisioning"))
+        {
+            JsonObject provisioningMode = doc.createNestedObject("WiFi Provisioning");
+            provisioningMode["cfgType"] = 11;
+            provisioningMode["cfgVal"] = 1;
+            provisioningMode["dftVal"] = 1 ;
+
+            JsonArray provisioningMode_vals = provisioningMode.createNestedArray("vals");
+            provisioningMode_vals.add(0);
+            provisioningMode_vals.add(1);
+            // provisioningMode_vals.add(2);
+
+            JsonArray provisioningMode_valTxt = provisioningMode.createNestedArray("valTxt");
+            provisioningMode_valTxt.add("None");
+            provisioningMode_valTxt.add("ESP-NOW Dongle");
+            // provisioningMode_valTxt.add("Access Point");
+
+            updateSettings = true;
+        }
+
         if (!doc.containsKey("Firmware Version") || doc["Firmware Version"].as<std::string>() != std::string(FIRMWARE_VERSION_STRING))
         {
             doc["Firmware Version"] = FIRMWARE_VERSION_STRING;
@@ -266,6 +289,13 @@ public:
             updateSettings = true;
         }
 
+        if (doc.overflowed())
+        {
+            #if DEBUG == 1
+            Serial.println("CompassUtils::CheckSettingsFile: Settings file overflowed.");
+            #endif
+        }
+
         if (updateSettings)
         {
             #if DEBUG == 1
@@ -273,6 +303,8 @@ public:
             #endif
             FilesystemModule::Utilities::WriteFile(FilesystemModule::Utilities::SettingsFileName(), doc);
         }
+
+        
     }
 
     static void ProcessSettingsFile(JsonDocument &doc)
@@ -377,6 +409,34 @@ public:
         RegisterRpcFunctions();
     }
 
+    static void WireFunctions()
+    {
+        ConnectivityModule::Utilities::InitializeEspNow() += [](esp_now_recv_cb_t receiveFunction, esp_now_send_cb_t sendFunction) 
+        { 
+            if (ConnectivityModule::Utilities::RpcChannelID() == -1)
+            {
+                ConnectivityModule::Utilities::RpcChannelID() = RpcModule::Utilities::AddRpcChannel(
+                    512, 
+                    std::bind(
+                        &ConnectivityModule::EspNowManager::
+                        ReceiveRpcQueue, 
+                        &EspNowManagerInstance, 
+                        std::placeholders::_1, 
+                        std::placeholders::_2), 
+                        RpcModule::Utilities::RpcResponseNullDestination);
+            }
+
+            RpcModule::Utilities::EnableRpcChannel(ConnectivityModule::Utilities::RpcChannelID());
+            
+            EspNowManagerInstance.Initialize(receiveFunction, sendFunction); 
+        };
+        ConnectivityModule::Utilities::DeinitializeEspNow() += [](bool disableRadio) 
+        { 
+            RpcModule::Utilities::DisableRpcChannel(ConnectivityModule::Utilities::RpcChannelID());
+            EspNowManagerInstance.Deinitialize(disableRadio); 
+        };
+    }
+
     static void RegisterRpcFunctions()
     {
         // Saved Locations
@@ -409,6 +469,20 @@ public:
 
         // System
         RpcModule::Utilities::RegisterRpc("RestartSystem", [](JsonDocument &_) { ESP.restart();  vTaskDelay(1000 / portTICK_PERIOD_MS); });
+
+        // Receive WiFi Credentials
+        RpcModule::Utilities::RegisterRpc("BroadcastWifiCredentials", [](JsonDocument &doc) 
+        { 
+            if (doc.containsKey("SSID") && doc.containsKey("Password"))
+            {
+                auto result = ConnectivityModule::RadioUtils::ConnectToAccessPoint(doc["SSID"].as<std::string>(), doc["Password"].as<std::string>());
+
+                if (result)
+                {
+                    ConnectivityModule::Utilities::DeinitializeEspNow().Invoke(false);
+                }
+            }
+        });
     }
 
     static void UpdateDisplay()
@@ -585,12 +659,12 @@ public:
     private:
     static void EnableServerOnWiFiConnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
-        if(event == SYSTEM_EVENT_STA_GOT_IP) 
+        if((int)event == (int)SYSTEM_EVENT_STA_GOT_IP) 
         {
             // Start server now that Wi-Fi is ready
             WebServerInstance.begin();
         } 
-        else if(event == SYSTEM_EVENT_STA_DISCONNECTED) 
+        else if((int)event == (int)SYSTEM_EVENT_STA_DISCONNECTED) 
         {
             // Optionally, you could stop the server if you like:
             // server.end();

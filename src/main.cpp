@@ -98,6 +98,8 @@ void setup()
   // Initialize LED Module
   LED_Manager::init(NUM_LEDS, CPU_CORE_APP);
 
+  delay(300);
+
   // Intialize Navigation Module
   // Initialize Compass
 #if HARDWARE_VERSION == 1
@@ -198,6 +200,8 @@ void setup()
 
   // Initialize RPC
   CompassUtils::InitializeRpc(1, CPU_CORE_LORA);
+
+  CompassUtils::WireFunctions();
 
   // Register edits for Lora
   
