@@ -1,5 +1,8 @@
 #include "LoraDriverInterface.h"
 #include <LoRa.h>
+#include "esp_log.h"
+
+static const char *TAG_LORA = "LORA";
 
 class ArduinoLoRaDriver : public LoraDriverInterface
 {
@@ -23,31 +26,28 @@ public:
         }
 
         #if DEBUG == 1
-        Serial.println("Initializing LoRa...");
-        Serial.print("CS: ");
-        Serial.println(_cs);
-        Serial.print("RESET: ");
-        Serial.println(_reset);
-        Serial.print("DIO0: ");
-        Serial.println(_dio0);
+        ESP_LOGI(TAG_LORA, "Initializing LoRa...");
+        ESP_LOGI(TAG_LORA, "CS: %d", _cs);
+        ESP_LOGI(TAG_LORA, "RESET: %d", _reset);
+        ESP_LOGI(TAG_LORA, "DIO0: %d", _dio0);
         #endif
 
         LoRa.setPins(_cs, _reset, _dio0);
         LoRa.setSPI(*_spi);
 
         #if DEBUG == 1
-        Serial.print("Beginning LoRa...");
+        ESP_LOGI(TAG_LORA, "Beginning LoRa...");
         #endif
         auto result = LoRa.begin(_loraFrequency) == 1;
 
         #if DEBUG == 1
         if (result)
         {
-            Serial.println("Success");
+            ESP_LOGI(TAG_LORA, "Success");
         }
         else
         {
-            Serial.println("Failed");
+            ESP_LOGE(TAG_LORA, "Failed");
         }
         #endif
 
@@ -79,22 +79,18 @@ public:
             if (msgSize == 0) continue;
 
             #if DEBUG == 1
-            // Serial.print("Message of length ");
-            // Serial.print(msgSize);
-            // Serial.print(" received: ");
+            // ESP_LOGD(TAG_LORA, "Message of length %d received", msgSize);
             // for (auto i = 0; i < msgSize; i++)
             // {
-            //     Serial.print(buffer[i], HEX);
-            //     Serial.print(" ");
+            //     printf("%02X ", buffer[i]);
             // }
-            // Serial.println();
+            // printf("\n");
             #endif
 
             auto result = deserializeMsgPack(doc, (const uint8_t *)buffer, sizeof(buffer));
 
 #if DEBUG == 1
-            Serial.print("Deserialization result: ");
-            Serial.println(result.code());
+            ESP_LOGD(TAG_LORA, "Deserialization result: %d", result.code());
 #endif
             return result.code() == DeserializationError::Ok;
         }
@@ -112,9 +108,8 @@ public:
         // serializeMsgPack(doc, buffer, sizeof(buffer));
 
         #if DEBUG == 1
-        Serial.print("Sending message: ");
+        ESP_LOGD(TAG_LORA, "Sending message:");
         serializeJson(doc, Serial);
-        Serial.println();
         #endif
 
         if (LoRa.beginPacket())
