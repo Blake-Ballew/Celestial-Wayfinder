@@ -3,6 +3,9 @@
 #include "CompassInterface.h"
 #include <Wire.h>
 #include <QMC5883LCompass.h>
+#include "esp_log.h"
+
+static const char *TAG_COMPASS_QMC = "COMPASS";
 
 class QMC5883L : public CompassInterface
 {
@@ -45,16 +48,11 @@ public:
     void PrintRawValues()
     {
         _Compass.read();
-        
+
         auto x = _Compass.getX();
         auto y = _Compass.getY();
         auto z = _Compass.getZ();
-        Serial.print("X: ");
-        Serial.print(x);
-        Serial.print(" Y: ");
-        Serial.print(y);
-        Serial.print(" Z: ");
-        Serial.println(z);
+        ESP_LOGD(TAG_COMPASS_QMC, "X: %d Y: %d Z: %d", x, y, z);
     }
 
     // Calibration methods

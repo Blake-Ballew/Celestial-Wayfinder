@@ -9,12 +9,14 @@
 #include "EspNowManager.h"
 #include "Display_Manager.h"
 #include "RpcManager.h"
-#include "NetworkUtils.h"
 
 #include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
 
 #include "ArduinoJson.h"
 #include "globalDefines.h"
+#include "esp_log.h"
+
+static const char *TAG_COMPASS = "COMPASS";
 
 namespace
 {
@@ -36,17 +38,17 @@ public:
 
     static void PassMessageReceivedToDisplay(uint32_t sendingUserID, bool isNew)
     {
-        if (isNew) 
+        if (isNew)
         {
             #if DEBUG == 1
-            Serial.println("CompassUtils::PassMessageReceivedToDisplay: New message received");
+            ESP_LOGD(TAG_COMPASS, "PassMessageReceivedToDisplay: New message received");
             #endif
             Display_Utils::sendInputCommand(MessageReceivedInputID);
         }
         #if DEBUG == 1
         else
         {
-            Serial.println("CompassUtils::PassMessageReceivedToDisplay: Old message received");
+            ESP_LOGD(TAG_COMPASS, "PassMessageReceivedToDisplay: Old message received");
         }
         #endif
 
@@ -61,8 +63,7 @@ public:
         auto returncode = FilesystemModule::Utilities::LoadSettingsFile(FilesystemModule::Utilities::SettingsFile());
 
 #if DEBUG == 1
-        Serial.print("CompassUtils::InitializeSettings: LoadSettingsFile returned ");
-        Serial.println(returncode);
+        ESP_LOGI(TAG_COMPASS, "InitializeSettings: LoadSettingsFile returned %d", returncode);
 #endif
 
         // CheckSettingsFile(FilesystemModule::Utilities::SettingsFile());
@@ -75,9 +76,8 @@ public:
         FilesystemModule::Utilities::SettingsUpdated().Invoke(FilesystemModule::Utilities::SettingsFile());
 
         #if DEBUG == 1
-        Serial.println("Settings File: ");
+        ESP_LOGD(TAG_COMPASS, "Settings File:");
         serializeJsonPretty(FilesystemModule::Utilities::SettingsFile(), Serial);
-        Serial.println();
         #endif
     }
 
@@ -292,14 +292,14 @@ public:
         if (doc.overflowed())
         {
             #if DEBUG == 1
-            Serial.println("CompassUtils::CheckSettingsFile: Settings file overflowed.");
+            ESP_LOGE(TAG_COMPASS, "CheckSettingsFile: Settings file overflowed");
             #endif
         }
 
         if (updateSettings)
         {
             #if DEBUG == 1
-            Serial.println("CompassUtils::FlashSettings: Updating settings file.");
+            ESP_LOGI(TAG_COMPASS, "FlashSettings: Updating settings file");
             #endif
             FilesystemModule::Utilities::WriteFile(FilesystemModule::Utilities::SettingsFileName(), doc);
         }
@@ -311,9 +311,8 @@ public:
     {
         // JsonDocument &doc = FilesystemModule::Utilities::SettingsFile();
         #if DEBUG == 1
-        // Serial.println("CompassUtils::ProcessSettingsFile");
+        // ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile");
         // serializeJson(doc, Serial);
-        // Serial.println();
         #endif
 
         if (!doc.isNull())
@@ -352,12 +351,7 @@ public:
             LED_Utils::setThemeColor(color);
             #if DEBUG == 1
             auto interfaceColor = LED_Pattern_Interface::ThemeColor();
-            Serial.print("LED Interface::ThemeColor: ");
-            Serial.print(interfaceColor.r);
-            Serial.print(", ");
-            Serial.print(interfaceColor.g);
-            Serial.print(", ");
-            Serial.println(interfaceColor.b);
+            ESP_LOGD(TAG_COMPASS, "LED Interface::ThemeColor: %d, %d, %d", interfaceColor.r, interfaceColor.g, interfaceColor.b);
             #endif
 
             // Lora Module
@@ -383,7 +377,7 @@ public:
             System_Utils::time24Hour = doc["24H Time"].as<bool>();
 
             #if DEBUG == 1
-            Serial.println("CompassUtils::ProcessSettingsFile: Done");
+            ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
             #endif
         }
     }
@@ -430,6 +424,7 @@ public:
             
             EspNowManagerInstance.Initialize(receiveFunction, sendFunction); 
         };
+        
         ConnectivityModule::Utilities::DeinitializeEspNow() += [](bool disableRadio) 
         { 
             RpcModule::Utilities::DisableRpcChannel(ConnectivityModule::Utilities::RpcChannelID());
@@ -605,8 +600,7 @@ public:
 
         auto returncode = FilesystemModule::Utilities::WriteSettingsFile(SETTINGS_FILENAME, doc);
         #if DEBUG == 1
-        Serial.print("CompassUtils::FlashSettings: ");
-        Serial.println(returncode);
+        ESP_LOGI(TAG_COMPASS, "FlashSettings: %d", returncode);
         #endif  
 
         if (inputID != 0)
@@ -657,6 +651,9 @@ public:
     }
 
     private:
+
+    const char * _TAG = "CompassUtils";
+
     static void EnableServerOnWiFiConnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
         if((int)event == (int)SYSTEM_EVENT_STA_GOT_IP) 

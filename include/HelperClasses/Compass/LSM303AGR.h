@@ -5,6 +5,9 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LIS2MDL.h>
 #include <Adafruit_LSM303_Accel.h>
+#include "esp_log.h"
+
+static const char *TAG_COMPASS_LSM = "COMPASS";
 
 namespace
 {
@@ -24,38 +27,38 @@ class LSM303AGR : public CompassInterface
 public:
     LSM303AGR()
     {
-        if (!Wire.available()) 
+        if (!Wire.available())
         {
             #if DEBUG == 1
-            Serial.println("Compass LSM303AGR::LSM303AGR: Initializing Wire");
+            ESP_LOGI(TAG_COMPASS_LSM, "LSM303AGR: Initializing Wire");
             #endif
         }
         else
         {
             #if DEBUG == 1
-            Serial.println("Compass LSM303AGR::LSM303AGR: Wire already initialized");
+            ESP_LOGI(TAG_COMPASS_LSM, "LSM303AGR: Wire already initialized");
             #endif
         }
 
         #if DEBUG == 1
-        Serial.println("Compass LSM303AGR::LSM303AGR: Initializing");
+        ESP_LOGI(TAG_COMPASS_LSM, "LSM303AGR: Initializing");
         #endif
 
         if (!_CompassMagnetometer.begin(0x1E, &Wire))
         {
-            Serial.println("Compass LSM303AGR::LSM303AGR: Magnetometer not found");
+            ESP_LOGE(TAG_COMPASS_LSM, "LSM303AGR: Magnetometer not found");
         }
 
         #if DEBUG == 1
-        Serial.println("_CompassMagnetometer Initialized");
+        ESP_LOGI(TAG_COMPASS_LSM, "CompassMagnetometer Initialized");
         #endif
 
         if (!_CompassAccelerometer.begin())
         {
-            Serial.println("Compass LSM303AGR::LSM303AGR: Accelerometer not found");
+            ESP_LOGE(TAG_COMPASS_LSM, "LSM303AGR: Accelerometer not found");
         }
 
-        Serial.println("Compass LSM303AGR::LSM303AGR: Initialized");
+        ESP_LOGI(TAG_COMPASS_LSM, "LSM303AGR: Initialized");
     }
 
     ~LSM303AGR()
@@ -117,18 +120,7 @@ public:
         float Ay = accelEvent.acceleration.y;
         float Az = accelEvent.acceleration.z;
 
-        Serial.print("Mx: ");
-        Serial.print(Mx);
-        Serial.print(" My: ");
-        Serial.print(My);
-        Serial.print(" Mz: ");
-        Serial.print(Mz);
-        Serial.print(" Ax: "); 
-        Serial.print(Ax);
-        Serial.print(" Ay: ");
-        Serial.print(Ay);
-        Serial.print(" Az: ");
-        Serial.println(Az);
+        // ESP_LOGD(TAG_COMPASS_LSM, "Mx: %.2f My: %.2f Mz: %.2f Ax: %.2f Ay: %.2f Az: %.2f", Mx, My, Mz, Ax, Ay, Az);
     }
 
     // Calibration methods

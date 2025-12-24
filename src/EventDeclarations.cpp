@@ -2,6 +2,7 @@
 #include "globalDefines.h"
 #include "LED_Manager.h"
 #include "Display_Manager.h"
+#include "esp_log.h"
 
 TaskHandle_t inputTaskHandle;
 TaskHandle_t radioReadTaskHandle;
@@ -11,7 +12,7 @@ ESP32Encoder *inputEncoder;
 
 void IRAM_ATTR button1ISR()
 {
-    Serial.println("button1ISR");
+    ESP_EARLY_LOGD(TAG, "button1ISR");
     static TickType_t lastISRTime = 0;
     if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_BUTTONS)
     {
@@ -122,7 +123,7 @@ void IRAM_ATTR enc_cb(void *arg)
     /*    if (enc == NULL)
         {
     #if DEBUG == 1
-            Serial.println("enc_cb: enc is NULL");
+            ESP_EARLY_LOGE(TAG, "enc_cb: enc is NULL");
     #endif
             return;
         }
@@ -175,7 +176,7 @@ void IRAM_ATTR enc_cb(void *arg)
 void IRAM_ATTR CompassDRDYISR()
 {
 #if DEBUG == 1
-    // Serial.println("CompassDRDYISR");
+    // ESP_EARLY_LOGD(TAG, "CompassDRDYISR");
 #endif
     // Navigation_Manager::read();
 }
