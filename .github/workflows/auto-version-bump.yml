@@ -1,0 +1,46 @@
+name: Auto Version Bump
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  bump-version:
+    # Skip if this is already a version bump commit
+    if: "!contains(github.event.head_commit.message, '[version bump]')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Bump patch version
+        run: |
+          # Read current version
+          MAJOR=$(jq -r '.major' version_config.json)
+          MINOR=$(jq -r '.minor' version_config.json)
+          PATCH=$(jq -r '.patch' version_config.json)
+
+          # Increment patch
+          NEW_PATCH=$((PATCH + 1))
+
+          # Update version_config.json
+          jq --arg major "$MAJOR" --arg minor "$MINOR" --arg patch "$NEW_PATCH" \
+            '.major = ($major | tonumber) | .minor = ($minor | tonumber) | .patch = ($patch | tonumber)' \
+            version_config.json > version_config.json.tmp
+          mv version_config.json.tmp version_config.json
+
+          echo "Version bumped to $MAJOR.$MINOR.$NEW_PATCH"
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version_config.json
+          git commit -m "Bump version to $(jq -r '"\(.major).\(.minor).\(.patch)"' version_config.json) [version bump]"
+          git push

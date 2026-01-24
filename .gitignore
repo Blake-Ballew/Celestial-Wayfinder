@@ -4,6 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 .qodo
+build_number.txt
 
 !sdkconfig.defaults
 sdkconfig*
