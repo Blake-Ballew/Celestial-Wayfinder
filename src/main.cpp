@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_event_base.h"
+#include "esp_log.h"
 #include "EventDeclarations.h"
 #include <ESP32Encoder.h>
 #include "globalDefines.h"
@@ -66,8 +67,7 @@ void setup()
 {
 #if DEBUG == 1
   Serial.begin(115200);
-  Serial.print("Initializing Hardware Version ");
-  Serial.println(HARDWARE_VERSION);
+  ESP_LOGI(TAG, "Initializing Hardware Version %d", HARDWARE_VERSION);
 #endif
 
   bootloader_random_enable();
@@ -104,7 +104,7 @@ void setup()
   // Initialize Compass
 #if HARDWARE_VERSION == 1
 #if DEBUG == 1
-  Serial.println("Using QMC5883L");
+  ESP_LOGI(TAG, "Using QMC5883L");
 #endif
   QMC5883L *QMC5883Lcompass = new QMC5883L();
   QMC5883Lcompass->SetInvertX(true);
@@ -113,13 +113,13 @@ void setup()
 #endif
 #if HARDWARE_VERSION == 2
 #if DEBUG == 1
-  Serial.println("Using LSM303AGR");
+  ESP_LOGI(TAG, "Using LSM303AGR");
 #endif
   compass = new LSM303AGR();
 #endif
 
   #if DEBUG == 1
-  Serial.println("Initializing Navigation Manager");
+  ESP_LOGI(TAG, "Initializing Navigation Manager");
   #endif
   // Initialize GPS Stream
   Serial2.begin(9600);
@@ -131,7 +131,7 @@ void setup()
 #if DEBUG == 1
   if (!success)
   {
-    Serial.println("Failed to initialize Lora module");
+    ESP_LOGE(TAG, "Failed to initialize Lora module");
   }
 #endif
 
@@ -152,7 +152,7 @@ void setup()
     {BUTTON_SOS, 16},
   };
 
-  Serial.println("Initializing LED pins");
+  ESP_LOGI(TAG, "Initializing LED pins");
   LED_Manager::InitializeInputIdLedPins(inputIdLedIdx);
   LED_Manager::initializeButtonFlashAnimation();
 
@@ -181,7 +181,7 @@ void setup()
   displayCommandQueue = Display_Manager::getDisplayCommandQueue();
 
   // Register message types
-  Serial.println("Registering message types");
+  ESP_LOGI(TAG, "Registering message types");
   MessageBase::SetMessageType(0x01);
   MessagePing::SetMessageType(0x02);
 
@@ -191,7 +191,7 @@ void setup()
   System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 2, CPU_CORE_APP);
 
   // Bind the radio send and receive tasks and then register them
-  Serial.println("Registering radio tasks");
+  ESP_LOGI(TAG, "Registering radio tasks");
 
   int radioTaskID = System_Utils::registerTask(CompassUtils::BoundRadioTask, "radio-task", 4096, &loraManager, 3, CPU_CORE_LORA);
   int sendQueueTaskID = System_Utils::registerTask(CompassUtils::BoundSendQueueTask, "send-queue-task", 4096, &loraManager, 2, CPU_CORE_LORA);
@@ -218,16 +218,12 @@ void setup()
 #if DEBUG == 1
   for (int i = 0; i <= 0x39; i++)
   {
-    // Serial.print("0x");
-    // Serial.print(i, HEX);
-    // Serial.print(": 0x");
-    // Serial.println(CompassUtils::driver.spiRead(i), HEX);
+    // ESP_LOGD(TAG, "0x%02X: 0x%02X", i, CompassUtils::driver.spiRead(i));
   }
 #endif
 
 #if DEBUG == 1
   // FilesystemUtils::PrintSettingsFile();
-  // Serial.println();
 #endif
 
   inputEncoder = &encoder;
@@ -276,9 +272,7 @@ void sendDebugInputs(void *pvParameters)
     if (Serial.available() > 0)
     {
       input = Serial.parseInt();
-      Serial.println();
-      Serial.printf("Passing in input: %d\n", input);
-      Serial.println();
+      ESP_LOGD(TAG, "Passing in input: %d", input);
       DisplayCommandQueueItem command;
       command.commandType = INPUT_COMMAND;
       command.commandData.inputCommand.inputID = input;
