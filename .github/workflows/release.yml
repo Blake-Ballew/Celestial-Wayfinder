@@ -14,35 +14,24 @@ on:
           - major
 
 jobs:
-  release:
+  bump-version:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    strategy:
-      matrix:
-        build_env: ['local-library-v1', 'local-library-v2']
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: ./Celestial-Wayfinder
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      # Also checkout esp-utilities repo
-      - uses: actions/checkout@v4
-        with:
-          repository: Blake-Ballew/esp32-utilities
-          path: ./esp32-utilities
 
       - name: Install jq
         run: sudo apt-get install -y jq
 
       - name: Pull latest changes
-        working-directory: ./Celestial-Wayfinder
         run: git pull origin main
 
       - name: Bump version if needed
-        working-directory: ./Celestial-Wayfinder
+        id: version
         run: |
           RELEASE_TYPE="${{ github.event.inputs.release_type }}"
 
@@ -74,13 +63,13 @@ jobs:
             mv version_config.json.tmp version_config.json
           fi
 
-          # Export version for later steps
-          echo "VERSION=$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH" >> $GITHUB_ENV
-          echo "RELEASE_TYPE=$RELEASE_TYPE" >> $GITHUB_ENV
+          # Export version
+          VERSION="$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Commit version bump
         if: github.event.inputs.release_type != 'patch'
-        working-directory: ./Celestial-Wayfinder
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -88,6 +77,29 @@ jobs:
           git commit -m "Bump version to ${{ env.VERSION }} [release] [version bump]"
           git pull --rebase origin main
           git push
+
+  build:
+    needs: bump-version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_env: ['local-library-v1', 'local-library-v2']
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ./Celestial-Wayfinder
+          ref: main
+
+      # Also checkout esp-utilities repo
+      - uses: actions/checkout@v4
+        with:
+          repository: Blake-Ballew/esp32-utilities
+          path: ./esp32-utilities
+
+      - name: Pull latest changes
+        working-directory: ./Celestial-Wayfinder
+        run: git pull origin main
 
       - uses: actions/setup-python@v5
         with:
@@ -109,16 +121,16 @@ jobs:
         working-directory: ./Celestial-Wayfinder
         run: |
           mkdir -p release-artifacts
-          cp .pio/build/${{ matrix.build_env }}/firmware.bin release-artifacts/firmware-${{ matrix.build_env }}-${{ env.VERSION }}.bin
+          cp .pio/build/${{ matrix.build_env }}/firmware.bin release-artifacts/firmware-${{ matrix.build_env }}-${{ needs.bump-version.outputs.version }}.bin
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-${{ matrix.build_env }}-${{ env.VERSION }}
+          name: firmware-${{ matrix.build_env }}-${{ needs.bump-version.outputs.version }}
           path: ./Celestial-Wayfinder/release-artifacts/*.bin
 
   create-release:
-    needs: release
+    needs: [bump-version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -131,15 +143,9 @@ jobs:
       - name: Pull latest changes
         run: git pull origin main
 
-      - name: Install jq
-        run: sudo apt-get install -y jq
-
-      - name: Get version
+      - name: Set version
         run: |
-          MAJOR=$(jq -r '.major' version_config.json)
-          MINOR=$(jq -r '.minor' version_config.json)
-          PATCH=$(jq -r '.patch' version_config.json)
-          echo "VERSION=$MAJOR.$MINOR.$PATCH" >> $GITHUB_ENV
+          echo "VERSION=${{ needs.bump-version.outputs.version }}" >> $GITHUB_ENV
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
