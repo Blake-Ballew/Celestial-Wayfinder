@@ -1,0 +1,161 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_env: ['local-library-v1', 'local-library-v2']
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ./Celestial-Wayfinder
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Also checkout esp-utilities repo
+      - uses: actions/checkout@v4
+        with:
+          repository: Blake-Ballew/esp32-utilities
+          path: ./esp32-utilities
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Bump version if needed
+        working-directory: ./Celestial-Wayfinder
+        run: |
+          RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+
+          # Read current version
+          MAJOR=$(jq -r '.major' version_config.json)
+          MINOR=$(jq -r '.minor' version_config.json)
+          PATCH=$(jq -r '.patch' version_config.json)
+
+          if [ "$RELEASE_TYPE" == "major" ]; then
+            NEW_MAJOR=$((MAJOR + 1))
+            NEW_MINOR=0
+            NEW_PATCH=0
+          elif [ "$RELEASE_TYPE" == "minor" ]; then
+            NEW_MAJOR=$MAJOR
+            NEW_MINOR=$((MINOR + 1))
+            NEW_PATCH=0
+          else
+            # patch - no version change
+            NEW_MAJOR=$MAJOR
+            NEW_MINOR=$MINOR
+            NEW_PATCH=$PATCH
+          fi
+
+          # Update version_config.json if version changed
+          if [ "$RELEASE_TYPE" != "patch" ]; then
+            jq --arg major "$NEW_MAJOR" --arg minor "$NEW_MINOR" --arg patch "$NEW_PATCH" \
+              '.major = ($major | tonumber) | .minor = ($minor | tonumber) | .patch = ($patch | tonumber)' \
+              version_config.json > version_config.json.tmp
+            mv version_config.json.tmp version_config.json
+          fi
+
+          # Export version for later steps
+          echo "VERSION=$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH" >> $GITHUB_ENV
+          echo "RELEASE_TYPE=$RELEASE_TYPE" >> $GITHUB_ENV
+
+      - name: Commit version bump
+        if: github.event.inputs.release_type != 'patch'
+        working-directory: ./Celestial-Wayfinder
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version_config.json
+          git commit -m "Bump version to ${{ env.VERSION }} [version bump]"
+          git push
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO Core
+        working-directory: ./Celestial-Wayfinder
+        run: pip install --upgrade platformio
+
+      - name: Generate Version Header
+        working-directory: ./Celestial-Wayfinder
+        run: python generate_version.py
+
+      - name: Build PlatformIO Project
+        working-directory: ./Celestial-Wayfinder
+        run: pio run --environment ${{ matrix.build_env }}
+
+      - name: Rename firmware binaries
+        working-directory: ./Celestial-Wayfinder
+        run: |
+          mkdir -p release-artifacts
+          cp .pio/build/${{ matrix.build_env }}/firmware.bin release-artifacts/firmware-${{ matrix.build_env }}-${{ env.VERSION }}.bin
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.build_env }}-${{ env.VERSION }}
+          path: ./Celestial-Wayfinder/release-artifacts/*.bin
+
+  create-release:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Get version
+        run: |
+          MAJOR=$(jq -r '.major' version_config.json)
+          MINOR=$(jq -r '.minor' version_config.json)
+          PATCH=$(jq -r '.patch' version_config.json)
+          echo "VERSION=$MAJOR.$MINOR.$PATCH" >> $GITHUB_ENV
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ env.VERSION }}" -m "Release version ${{ env.VERSION }}"
+          git push origin "v${{ env.VERSION }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
+          body: |
+            Release version ${{ env.VERSION }}
+
+            Release type: ${{ github.event.inputs.release_type }}
+          files: artifacts/**/*.bin
+          draft: false
+          prerelease: false

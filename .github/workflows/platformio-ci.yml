@@ -35,6 +35,10 @@ jobs:
         working-directory: ./Celestial-Wayfinder
         run: pip install --upgrade platformio
 
+      - name: Generate Version Header
+        working-directory: ./Celestial-Wayfinder
+        run: python generate_version.py
+
       - name: Build PlatformIO Project
         working-directory: ./Celestial-Wayfinder
         run: pio run --environment ${{ matrix.build_env }}
