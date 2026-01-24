@@ -89,13 +89,6 @@ jobs:
           git pull --rebase origin main
           git push
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.platformio/.cache
-          key: ${{ runner.os }}-pio
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
