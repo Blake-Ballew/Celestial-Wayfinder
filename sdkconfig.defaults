@@ -1,0 +1,28 @@
+# From https://github.com/platformio/platform-espressif32/blob/develop/examples/espidf-arduino-blink/sdkconfig.defaults
+CONFIG_AUTOSTART_ARDUINO=y
+CONFIG_FREERTOS_HZ=1000
+
+CONFIG_ESPTOOLPY_FLASHSIZE_2MB=y
+
+# FLASH size minimization from https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/performance/size.html#reducing-overall-size
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y
+CONFIG_LIBC_NEWLIB_NANO_FORMAT=y
+
+CONFIG_ESP_ERR_TO_NAME_LOOKUP=n
+
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+
+CONFIG_VFS_SUPPORT_TERMIOS=n
+CONFIG_VFS_SUPPORT_SELECT=n
+
+# NimBLE stack.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_HOST=BT_NIMBLE_ENABLED
+
+# NimBLE size optimizations.
+CONFIG_BTDM_CTRL_BLE_MAX_CONN=1
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+

@@ -25,6 +25,7 @@ namespace
     static RpcModule::Manager RpcManagerInstance;
     static ConnectivityModule::EspNowManager EspNowManagerInstance;
     static AsyncWebServer WebServerInstance(80);
+    static AsyncCorsMiddleware cors;
 }
 
 // Static class to help interface with esp32 utils compass functionality
@@ -395,6 +396,9 @@ public:
 
     static void InitializeRpc(size_t rpcTaskPriority, size_t rpcTaskCore)
     {
+        // Allow CORS requests for RPC server.
+        WebServerInstance.addMiddleware(&cors);
+
         RpcManagerInstance.Init(rpcTaskPriority, rpcTaskCore);
         RpcManagerInstance.RegisterWebServerRpc(WebServerInstance); 
 
@@ -464,6 +468,7 @@ public:
 
         // System
         RpcModule::Utilities::RegisterRpc("RestartSystem", [](JsonDocument &_) { ESP.restart();  vTaskDelay(1000 / portTICK_PERIOD_MS); });
+        RpcModule::Utilities::RegisterRpc("GetSystemInfo", System_Utils::GetSystemInfoRpc);
 
         // Receive WiFi Credentials
         RpcModule::Utilities::RegisterRpc("BroadcastWifiCredentials", [](JsonDocument &doc) 
