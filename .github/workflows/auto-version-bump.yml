@@ -7,8 +7,8 @@ on:
 
 jobs:
   bump-version:
-    # Skip if this is already a version bump commit
-    if: "!contains(github.event.head_commit.message, '[version bump]')"
+    # Skip if this is already a version bump commit or if triggered by release workflow
+    if: "!contains(github.event.head_commit.message, '[version bump]') && !contains(github.event.head_commit.message, '[release]')"
     runs-on: ubuntu-latest
     permissions:
       contents: write
