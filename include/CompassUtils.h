@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Display_Utils.h"
 #include "LoraManager.h"
 #include "FilesystemUtils.h"
 #include "RpcUtils.h"
@@ -374,22 +373,6 @@ public:
     static void UpdateDisplay()
     {
         display.display();
-    }
-
-    static void FlashMessages(uint8_t inputID)
-    {
-        Display_Utils::clearDisplay();
-        Display_Utils::printCenteredText("Flashing Messages...");
-        Display_Utils::UpdateDisplay().Invoke();
-
-
-        LoraUtils::AddSavedMessage("Ping", false);
-
-
-        Display_Utils::clearDisplay();
-        Display_Utils:: printCenteredText("Messages Flashed!");
-        Display_Utils::UpdateDisplay().Invoke();
-        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 
     static void ClearLocations(uint8_t inputID)
