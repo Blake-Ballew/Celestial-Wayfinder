@@ -120,7 +120,7 @@ public:
         float Ay = accelEvent.acceleration.y;
         float Az = accelEvent.acceleration.z;
 
-        // ESP_LOGD(TAG_COMPASS_LSM, "Mx: %.2f My: %.2f Mz: %.2f Ax: %.2f Ay: %.2f Az: %.2f", Mx, My, Mz, Ax, Ay, Az);
+        ESP_LOGD(TAG_COMPASS_LSM, "Mx: %.2f My: %.2f Mz: %.2f Ax: %.2f Ay: %.2f Az: %.2f", Mx, My, Mz, Ax, Ay, Az);
     }
 
     // Calibration methods

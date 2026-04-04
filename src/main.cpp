@@ -12,7 +12,6 @@
 #include "Settings_Manager.h"
 #include "LoraManager.h"
 #include "NavigationManager.h"
-#include "FilesystemManager.h"
 
 #include "CompassUtils.h"
 
@@ -26,6 +25,8 @@
 #include "RingPoint.h"
 #include "Illuminate_Button.h"
 #include "Ring_Pulse.h"
+
+#include "MessagePing.h"
 
 extern "C"
 {
@@ -58,7 +59,7 @@ CompassInterface *compass;
 NavigationManager navigationManager;
 
 // Filesytstem Manager. May not even need this
-FilesystemModule::Manager filesystemManager;
+
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
@@ -90,15 +91,13 @@ void setup()
   encoder.attachFullQuad(ENC_A, ENC_B);
   encoder.setFilter(1023);
   encoder.setCount(0);
-
-  // Initialize Filesystem and settings
-  filesystemManager.InitializeFilesystem();
+  
   CompassUtils::InitializeSettings();
 
   // Initialize LED Module
   LED_Manager::init(NUM_LEDS, CPU_CORE_APP);
 
-  delay(300);
+  vTaskDelay(300);
 
   // Intialize Navigation Module
   // Initialize Compass
@@ -136,25 +135,28 @@ void setup()
 #endif
 
   // TODO remove home window from here
-  Display_Manager::init();
-  CompassUtils::RegisterCallbacksDisplayManager(nullptr);
+  CompassUtils::InitializeDisplayManager();
 
   System_Utils::init();
 
   // Initialize inputID to LED index mapping
   std::unordered_map<uint8_t, uint8_t> inputIdLedIdx = {
-    {BUTTON_1, 22},
-    {BUTTON_2, 19},
-    {BUTTON_3, 18},
-    {BUTTON_4, 17},
-    {ENC_UP, 20},
-    {ENC_DOWN, 21},
+    {DisplayModule::InputID::BUTTON_1, 22},
+    {DisplayModule::InputID::BUTTON_2, 19},
+    {DisplayModule::InputID::BUTTON_3, 18},
+    {DisplayModule::InputID::BUTTON_4, 17},
+    {DisplayModule::InputID::ENC_UP, 20},
+    {DisplayModule::InputID::ENC_DOWN, 21},
     {BUTTON_SOS, 16},
   };
 
   ESP_LOGI(TAG, "Initializing LED pins");
   LED_Manager::InitializeInputIdLedPins(inputIdLedIdx);
   LED_Manager::initializeButtonFlashAnimation();
+  DisplayModule::Utilities::getInputRaised() += [](const DisplayModule::InputContext &ctx) {
+    ESP_LOGI(TAG, "Passing input to LED manager: %d", ctx.inputID);
+    LED_Manager::inputButtonFlash(ctx);
+  };
 
   // Initialize other animations
   ScrollWheel *scrollWheel = new ScrollWheel();
@@ -178,7 +180,7 @@ void setup()
   ringPoint->configurePattern(cfg);
   ringPulse->configurePattern(cfg);
 
-  displayCommandQueue = Display_Manager::getDisplayCommandQueue();
+  displayCommandQueue = DisplayModule::Utilities::getDisplayCommandQueue();
 
   // Register message types
   ESP_LOGI(TAG, "Registering message types");
@@ -188,7 +190,8 @@ void setup()
   LoraUtils::RegisterMessageDeserializer(MessageBase::MessageType(), MessageBase::MessageFactory);
   LoraUtils::RegisterMessageDeserializer(MessagePing::MessageType(), MessagePing::MessageFactory);
 
-  System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 2, CPU_CORE_APP);
+  CompassUtils::InitializeDisplayManager();
+  // System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 2, CPU_CORE_APP);
 
   // Bind the radio send and receive tasks and then register them
   ESP_LOGI(TAG, "Registering radio tasks");
@@ -244,7 +247,7 @@ void loop()
 
 void enableInterruptsHandler() 
 {
-  attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
+  // attachInterrupt(BUTTON_SOS_PIN, buttonSOSISR, FALLING);
   attachInterrupt(BUTTON_1_PIN, button1ISR, FALLING);
   attachInterrupt(BUTTON_2_PIN, button2ISR, FALLING);
   attachInterrupt(BUTTON_3_PIN, button3ISR, FALLING);
