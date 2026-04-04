@@ -5,7 +5,6 @@
 #include "FilesystemUtils.h"
 #include "RpcUtils.h"
 #include "LED_Utils.h"
-#include "Settings_Manager.h"
 #include "FilesystemManager.h"
 #include "EspNowManager.h"
 #include "Display_Manager.h"

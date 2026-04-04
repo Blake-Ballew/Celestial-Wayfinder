@@ -10,8 +10,6 @@
 
 #include <ArduinoJson.hpp>
 
-#include "Display_Manager.h"
-#include "Settings_Manager.h"
 #include "LoraManager.h"
 #include "NavigationManager.h"
 
