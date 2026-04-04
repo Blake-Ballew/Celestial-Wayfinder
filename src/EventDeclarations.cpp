@@ -3,6 +3,7 @@
 #include "LED_Manager.h"
 #include "Display_Manager.h"
 #include "esp_log.h"
+#include "DisplayUtilities.hpp"
 
 TaskHandle_t inputTaskHandle;
 TaskHandle_t radioReadTaskHandle;
@@ -12,7 +13,7 @@ ESP32Encoder *inputEncoder;
 
 void IRAM_ATTR button1ISR()
 {
-    ESP_EARLY_LOGD(TAG, "button1ISR");
+    ESP_EARLY_LOGI(TAG, "button1ISR");
     static TickType_t lastISRTime = 0;
     if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_BUTTONS)
     {
@@ -22,9 +23,9 @@ void IRAM_ATTR button1ISR()
     lastISRTime = xTaskGetTickCount();
 
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    DisplayCommandQueueItem command;
-    command.commandType = INPUT_COMMAND;
-    command.commandData.inputCommand.inputID = BUTTON_1;
+    DisplayModule::DisplayCommandQueueItem command;
+    command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
+    command.commandData.inputCommand.inputID = DisplayModule::InputID::BUTTON_1;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
@@ -43,9 +44,9 @@ void IRAM_ATTR button2ISR()
     lastISRTime = xTaskGetTickCount();
 
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    DisplayCommandQueueItem command;
-    command.commandType = INPUT_COMMAND;
-    command.commandData.inputCommand.inputID = BUTTON_2;
+    DisplayModule::DisplayCommandQueueItem command;
+    command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
+    command.commandData.inputCommand.inputID = DisplayModule::InputID::BUTTON_2;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
@@ -64,9 +65,9 @@ void IRAM_ATTR button3ISR()
     lastISRTime = xTaskGetTickCount();
 
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    DisplayCommandQueueItem command;
-    command.commandType = INPUT_COMMAND;
-    command.commandData.inputCommand.inputID = BUTTON_3;
+    DisplayModule::DisplayCommandQueueItem command;
+    command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
+    command.commandData.inputCommand.inputID = DisplayModule::InputID::BUTTON_3;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
@@ -85,9 +86,9 @@ void IRAM_ATTR button4ISR()
     lastISRTime = xTaskGetTickCount();
 
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    DisplayCommandQueueItem command;
-    command.commandType = INPUT_COMMAND;
-    command.commandData.inputCommand.inputID = BUTTON_4;
+    DisplayModule::DisplayCommandQueueItem command;
+    command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
+    command.commandData.inputCommand.inputID = DisplayModule::InputID::BUTTON_4;
     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
     {
@@ -95,26 +96,26 @@ void IRAM_ATTR button4ISR()
     }
 }
 
-void IRAM_ATTR buttonSOSISR()
-{
-    static TickType_t lastISRTime = 0;
-    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_BUTTONS)
-    {
-        return;
-    }
+// void IRAM_ATTR buttonSOSISR()
+// {
+//     static TickType_t lastISRTime = 0;
+//     if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_BUTTONS)
+//     {
+//         return;
+//     }
 
-    lastISRTime = xTaskGetTickCount();
+//     lastISRTime = xTaskGetTickCount();
 
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    DisplayCommandQueueItem command;
-    command.commandType = INPUT_COMMAND;
-    command.commandData.inputCommand.inputID = BUTTON_SOS;
-    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
-    if (xHigherPriorityTaskWoken)
-    {
-        portYIELD_FROM_ISR();
-    }
-}
+//     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+//     DisplayModule::DisplayCommandQueueItem command;
+//     command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
+//     command.commandData.inputCommand.inputID = BUTTON_SOS;
+//     xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
+//     if (xHigherPriorityTaskWoken)
+//     {
+//         portYIELD_FROM_ISR();
+//     }
+// }
 
 void IRAM_ATTR enc_cb(void *arg)
 {
@@ -138,24 +139,24 @@ void IRAM_ATTR enc_cb(void *arg)
         }
 
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        DisplayCommandQueueItem command;
-        command.commandType = INPUT_COMMAND;
+        DisplayModule::DisplayCommandQueueItem command;
+        command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
         if (currCount > prevCount)
         {
             #if HARDWARE_VERSION == 1
-            command.commandData.inputCommand.inputID = ENC_DOWN;
+            command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
             #endif
             #if HARDWARE_VERSION == 2
-            command.commandData.inputCommand.inputID = ENC_UP;
+            command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
             #endif
         }
         else if (currCount < prevCount)
         {
             #if HARDWARE_VERSION == 1
-            command.commandData.inputCommand.inputID = ENC_UP;
+            command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
             #endif
             #if HARDWARE_VERSION == 2
-            command.commandData.inputCommand.inputID = ENC_DOWN;
+            command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
             #endif
         }
         else

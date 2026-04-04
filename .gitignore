@@ -8,3 +8,4 @@ build_number.txt
 
 !sdkconfig.defaults
 sdkconfig*
+build/version.json

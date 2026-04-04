@@ -6,15 +6,32 @@
 #include "RpcUtils.h"
 #include "LED_Utils.h"
 #include "Settings_Manager.h"
+#include "FilesystemManager.h"
 #include "EspNowManager.h"
 #include "Display_Manager.h"
+#include "DisplayManager.hpp"
+#include "WindowFactories.hpp"
+
 #include "RpcManager.h"
+#include "SettingsInterface.hpp"
+#include <map>
+#include "Bluetooth_Utils.h"
 
 #include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
 
 #include "ArduinoJson.h"
 #include "globalDefines.h"
 #include "esp_log.h"
+
+// Window Includes
+
+#include "HelperClasses/Window/HomeWindow.hpp"
+#include "CompassWindow.hpp"
+#include "GpsWindow.hpp"
+#include "DiagnosticsWindow.hpp"
+#include "EditSavedLocationsWindow.hpp"
+#include "EditStatusMessagesWindow.hpp"
+#include "WiFiRpcWindow.hpp"
 
 static const char *TAG_COMPASS = "COMPASS";
 
@@ -23,9 +40,14 @@ namespace
     const char *SETTINGS_FILENAME PROGMEM = "/Settings.msgpk";
     const char *OLD_SETTINGS_FILENAME PROGMEM = "/settings.json";
     static RpcModule::Manager RpcManagerInstance;
+    static DisplayModule::Manager DisplayManagerInstance;
     static ConnectivityModule::EspNowManager EspNowManagerInstance;
+    FilesystemModule::Manager filesystemManagerInstance;
     static AsyncWebServer WebServerInstance(80);
     static AsyncCorsMiddleware cors;
+    static std::shared_ptr<DisplayModule::HomeWindow> _homeWindowInstance;
+
+    Adafruit_SSD1306 display = Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire);
 }
 
 // Static class to help interface with esp32 utils compass functionality
@@ -42,14 +64,26 @@ public:
         if (isNew)
         {
             #if DEBUG == 1
-            ESP_LOGD(TAG_COMPASS, "PassMessageReceivedToDisplay: New message received");
+            ESP_LOGI(TAG_COMPASS, "PassMessageReceivedToDisplay: New message received");
             #endif
-            Display_Utils::sendInputCommand(MessageReceivedInputID);
+            
+            // Check if we're on home window
+            if (_homeWindowInstance == DisplayModule::Utilities::activeWindow())
+            {
+                ESP_LOGI(TAG, "Refreshing home window");
+                _homeWindowInstance->onMessageReceived();
+                DisplayModule::Utilities::render();
+            }
+
+            if (System_Utils::silentMode == false)
+            {
+                LED_Manager::buzzerNotification();
+            }
         }
         #if DEBUG == 1
         else
         {
-            ESP_LOGD(TAG_COMPASS, "PassMessageReceivedToDisplay: Old message received");
+            ESP_LOGI(TAG_COMPASS, "PassMessageReceivedToDisplay: Old message received");
         }
         #endif
 
@@ -59,271 +93,123 @@ public:
 
     static void InitializeSettings()
     {   
-        // DynamicJsonDocument settings(2048);
-        // FilesystemModule::Utilities::SettingsFileName() = SETTINGS_FILENAME;
-        auto returncode = FilesystemModule::Utilities::LoadSettingsFile(FilesystemModule::Utilities::SettingsFile());
+        filesystemManagerInstance.InitializeFilesystem();
 
-#if DEBUG == 1
-        ESP_LOGI(TAG_COMPASS, "InitializeSettings: LoadSettingsFile returned %d", returncode);
-#endif
+        CheckDeviceInfo();
+        auto settings = GenerateSettings();
+        FilesystemModule::Utilities::DeviceSettings() = std::move(settings);
 
-        // CheckSettingsFile(FilesystemModule::Utilities::SettingsFile());
-
-        FilesystemModule::Utilities::SettingsUpdated() += CheckSettingsFile;
         FilesystemModule::Utilities::SettingsUpdated() += ProcessSettingsFile;
         FilesystemModule::Utilities::SettingsUpdated() += ConnectivityModule::Utilities::ProcessSettings;
         FilesystemModule::Utilities::SettingsUpdated() += System_Utils::UpdateSettings;
+        FilesystemModule::Utilities::SettingsUpdated() += Bluetooth_Utils::SettingsUpdated;
 
-        FilesystemModule::Utilities::SettingsUpdated().Invoke(FilesystemModule::Utilities::SettingsFile());
+        FilesystemModule::Utilities::RequestSettingsRefresh() += []()
+        {
+            FilesystemModule::Utilities::InvokeSettingsUpdated(FilesystemModule::Utilities::DeviceSettings());
+        };
 
-        #if DEBUG == 1
-        ESP_LOGD(TAG_COMPASS, "Settings File:");
-        serializeJsonPretty(FilesystemModule::Utilities::SettingsFile(), Serial);
-        #endif
+        FilesystemModule::Utilities::RequestSettingsRefresh().Invoke();
     }
 
-    static void CheckSettingsFile(JsonDocument &doc)
+    static void CheckDeviceInfo()
     {
-        bool updateSettings = false;
-
-        if (!doc.containsKey("UserID"))
+        auto& deviceInfo = FilesystemModule::Utilities::DeviceInfo();
+        if (!deviceInfo.isKey("UserID"))
         {
-            doc["UserID"] = esp_random();
-            updateSettings = true;
+            uint32_t userID = esp_random();
+            deviceInfo.putUInt("UserID", userID);
+            ESP_LOGI(TAG_COMPASS, "Generated new UserID: %u", userID);
         }
 
-        if (!doc.containsKey("User Name"))
+        if (!deviceInfo.isKey("Firmware") || deviceInfo.getString("Firmware").c_str() != std::string(FIRMWARE_VERSION_STRING))
+        {
+            deviceInfo.putString("Firmware", FIRMWARE_VERSION_STRING);
+            ESP_LOGI(TAG_COMPASS, "Set Firmware Version: %s", FIRMWARE_VERSION_STRING);
+        }
+
+        if (deviceInfo.getInt("Hardware", -1) != HARDWARE_VERSION)
+        {
+            deviceInfo.putInt("Hardware", HARDWARE_VERSION);
+            ESP_LOGI(TAG_COMPASS, "Set Hardware Version: %d", HARDWARE_VERSION);
+        }
+    }
+
+    static std::map<std::string, std::shared_ptr<FilesystemModule::SettingsInterface>> GenerateSettings()
+    {
+        std::map<std::string, std::shared_ptr<FilesystemModule::SettingsInterface>> settings;
+
+        std::string defaultUserName;
+        std::string defaultDeviceName;
         {
             char usernamebuffer[10];
-            sprintf(usernamebuffer, "User_%04X", doc["UserID"].as<uint32_t>() & 0xFFFF);
-            std::string username = usernamebuffer;
-
-            JsonObject User_Name = doc.createNestedObject("User Name");
-            User_Name["cfgType"] = 10;
-            User_Name["cfgVal"] = usernamebuffer;
-            User_Name["dftVal"] = usernamebuffer;
-            User_Name["maxLen"] = 12;
-            doc["Silent Mode"] = false;
-
-            updateSettings = true;
+            sprintf(usernamebuffer, "User_%04X", FilesystemModule::Utilities::DeviceInfo().getUInt("UserID") & 0xFFFF);
+            defaultUserName = usernamebuffer;
         }
-
-        if (!doc.containsKey("Device Name"))
         {
-            char devicenamebuffer[21];
-            sprintf(devicenamebuffer, "Beacon_%04X", doc["UserID"].as<uint32_t>() & 0xFFFF);
-            std::string deviceName = devicenamebuffer;
-
-            JsonObject Device_Name = doc.createNestedObject("Device Name");
-            Device_Name["cfgType"] = 10;
-            Device_Name["cfgVal"] = deviceName;
-            Device_Name["dftVal"] = deviceName;
-            Device_Name["maxLen"] = 20;
-            doc["Silent Mode"] = false;
-
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("Color Theme"))
-        {
-            JsonObject Color_Theme = doc.createNestedObject("Color Theme");
-            Color_Theme["cfgType"] = 11;
-            Color_Theme["cfgVal"] = 2;
-            Color_Theme["dftVal"] = 2;
-
-            JsonArray Color_Theme_vals = Color_Theme.createNestedArray("vals");
-            Color_Theme_vals.add(0);
-            Color_Theme_vals.add(1);
-            Color_Theme_vals.add(2);
-            Color_Theme_vals.add(3);
-            Color_Theme_vals.add(4);
-            Color_Theme_vals.add(5);
-            Color_Theme_vals.add(6);
-            Color_Theme_vals.add(7);
-            Color_Theme_vals.add(8);
-
-            JsonArray Color_Theme_valTxt = Color_Theme.createNestedArray("valTxt");
-            Color_Theme_valTxt.add("Custom");
-            Color_Theme_valTxt.add("Red");
-            Color_Theme_valTxt.add("Green");
-            Color_Theme_valTxt.add("Blue");
-            Color_Theme_valTxt.add("Purple");
-            Color_Theme_valTxt.add("Yellow");
-            Color_Theme_valTxt.add("Cyan");
-            Color_Theme_valTxt.add("White");
-            Color_Theme_valTxt.add("Orange");
-
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("Theme Red"))
-        {
-            JsonObject Theme_Red = doc.createNestedObject("Theme Red");
-            Theme_Red["cfgType"] = 8;
-            Theme_Red["cfgVal"] = 0;
-            Theme_Red["dftVal"] = 0;
-            Theme_Red["maxVal"] = 255;
-            Theme_Red["minVal"] = 0;
-            Theme_Red["incVal"] = 1;
-            Theme_Red["signed"] = false;
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("Theme Green"))
-        {
-            JsonObject Theme_Green = doc.createNestedObject("Theme Green");
-            Theme_Green["cfgType"] = 8;
-            Theme_Green["cfgVal"] = 255;
-            Theme_Green["dftVal"] = 255;
-            Theme_Green["maxVal"] = 255;
-            Theme_Green["minVal"] = 0;
-            Theme_Green["incVal"] = 1;
-            Theme_Green["signed"] = false;
-            updateSettings = true;
-        } 
-
-        if (!doc.containsKey("Theme Blue"))
-        {
-            JsonObject Theme_Blue = doc.createNestedObject("Theme Blue");
-            Theme_Blue["cfgType"] = 8;
-            Theme_Blue["cfgVal"] = 0;
-            Theme_Blue["dftVal"] = 0;
-            Theme_Blue["maxVal"] = 255;
-            Theme_Blue["minVal"] = 0;
-            Theme_Blue["incVal"] = 1;
-            Theme_Blue["signed"] = false;
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("Frequency"))
-        {
-            JsonObject Frequency = doc.createNestedObject("Frequency");
-            Frequency["cfgType"] = 9;
-            Frequency["cfgVal"] = 914.9;
-            Frequency["dftVal"] = 914.9;
-            Frequency["maxVal"] = 914.9;
-            Frequency["minVal"] = 902.3;
-            Frequency["incVal"] = 0.2;
-
-            updateSettings = true;
+            char devicenamebuffer[20];
+            sprintf(devicenamebuffer, "Beacon_%04X", FilesystemModule::Utilities::DeviceInfo().getUInt("UserID") & 0xFFFF);
+            defaultDeviceName = devicenamebuffer;
         }
         
-        if (!doc.containsKey("Modem Config"))
+        auto userName = std::make_shared<FilesystemModule::StringSetting>("User Name", defaultUserName, 12);
+        settings[userName->key] = userName;
+
+        auto deviceName = std::make_shared<FilesystemModule::StringSetting>("Device Name", defaultDeviceName, 20);
+        settings[deviceName->key] = deviceName;
+
+        std::vector<std::string> colorThemeOptions = {"Custom", "Red", "Green", "Blue", "Purple", "Yellow", "Cyan", "White", "Orange"};
+        std::vector<int> colorThemeValues = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+        auto colorTheme = std::make_shared<FilesystemModule::EnumSetting>("Theme Color", 2, colorThemeOptions, colorThemeValues);
+        settings[colorTheme->key] = colorTheme;
+
+        auto themeRed = std::make_shared<FilesystemModule::IntSetting>("Theme Red", 0, 0, 255, 1);
+        settings[themeRed->key] = themeRed;
+
+        auto themeGreen = std::make_shared<FilesystemModule::IntSetting>("Theme Green", 255, 0, 255, 1);
+        settings[themeGreen->key] = themeGreen;
+
+        auto themeBlue = std::make_shared<FilesystemModule::IntSetting>("Theme Blue", 0, 0, 255, 1);
+        settings[themeBlue->key] = themeBlue;
+
+        // TODO: dumb this down to walkie-talkie style channels
+        auto frequency = std::make_shared<FilesystemModule::FloatSetting>("Frequency", 914.9, 902.3, 914.9, 0.2);
+        settings[frequency->key] = frequency;
+
+        auto broadcastAttempts = std::make_shared<FilesystemModule::IntSetting>("Num Broadcasts", 3, 1, 5, 1);
+        settings[broadcastAttempts->key] = broadcastAttempts;
+
+        auto silentMode = std::make_shared<FilesystemModule::BoolSetting>("Silent Mode", false);
+        settings[silentMode->key] = silentMode;
+
+        auto time24hr = std::make_shared<FilesystemModule::BoolSetting>("24H Time", false);
+        settings[time24hr->key] = time24hr;
+
+        std::vector<std::string> wifiOptions = {"Off", "AP Mode", "Station Mode"};
+        std::vector<int> wifiValues = {0, 1, 2};
+        auto wifiProvisioning = std::make_shared<FilesystemModule::EnumSetting>("WiFi Mode", 0, wifiOptions, wifiValues);
+        settings[wifiProvisioning->key] = wifiProvisioning;
+
+        for (const auto& setting : settings)
         {
-            JsonObject Modem_Config = doc.createNestedObject("Modem Config");
-            Modem_Config["cfgType"] = 11;
-            Modem_Config["cfgVal"] = 1;
-            Modem_Config["dftVal"] = 1 ;
-
-            JsonArray Modem_Config_vals = Modem_Config.createNestedArray("vals");
-            Modem_Config_vals.add(0);
-            Modem_Config_vals.add(1);
-            Modem_Config_vals.add(2);
-            Modem_Config_vals.add(3);
-            Modem_Config_vals.add(4);
-
-            JsonArray Modem_Config_valTxt = Modem_Config.createNestedArray("valTxt");
-            Modem_Config_valTxt.add("125 kHz, 4/5, 128");
-            Modem_Config_valTxt.add("500 kHz, 4/5, 128");
-            Modem_Config_valTxt.add("31.25 kHz, 4/8, 512");
-            Modem_Config_valTxt.add("125 kHz, 4/8, 4096");
-            Modem_Config_valTxt.add("125 khz, 4/5, 2048");
-
-            updateSettings = true;
+            setting.second->loadFromPreferences(FilesystemModule::Utilities::SettingsPreference());
         }
 
-        if (!doc.containsKey("Broadcast Attempts"))
-        {
-            JsonObject Broadcast_Attempts = doc.createNestedObject("Broadcast Attempts");
-            Broadcast_Attempts["cfgType"] = 8;
-            Broadcast_Attempts["cfgVal"] = 3;
-            Broadcast_Attempts["dftVal"] = 3;
-            Broadcast_Attempts["maxVal"] = 5;
-            Broadcast_Attempts["minVal"] = 1;
-            Broadcast_Attempts["incVal"] = 1;
-            Broadcast_Attempts["signed"] = false;
-
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("Silent Mode"))
-        {
-            doc["Silent Mode"] = false;
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("24H Time"))
-        {
-            doc["24H Time"] = false;    
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("WiFi Provisioning"))
-        {
-            JsonObject provisioningMode = doc.createNestedObject("WiFi Provisioning");
-            provisioningMode["cfgType"] = 11;
-            provisioningMode["cfgVal"] = 1;
-            provisioningMode["dftVal"] = 1 ;
-
-            JsonArray provisioningMode_vals = provisioningMode.createNestedArray("vals");
-            provisioningMode_vals.add(0);
-            provisioningMode_vals.add(1);
-            // provisioningMode_vals.add(2);
-
-            JsonArray provisioningMode_valTxt = provisioningMode.createNestedArray("valTxt");
-            provisioningMode_valTxt.add("None");
-            provisioningMode_valTxt.add("ESP-NOW Dongle");
-            // provisioningMode_valTxt.add("Access Point");
-
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("Firmware Version") || doc["Firmware Version"].as<std::string>() != std::string(FIRMWARE_VERSION_STRING))
-        {
-            doc["Firmware Version"] = FIRMWARE_VERSION_STRING;
-            updateSettings = true;
-        }
-
-        if (!doc.containsKey("Hardware Version") || doc["Hardware Version"].as<int>() != HARDWARE_VERSION)
-        {
-            doc["Hardware Version"] = HARDWARE_VERSION;
-            updateSettings = true;
-        }
-
-        if (doc.overflowed())
-        {
-            #if DEBUG == 1
-            ESP_LOGE(TAG_COMPASS, "CheckSettingsFile: Settings file overflowed");
-            #endif
-        }
-
-        if (updateSettings)
-        {
-            #if DEBUG == 1
-            ESP_LOGI(TAG_COMPASS, "FlashSettings: Updating settings file");
-            #endif
-            FilesystemModule::Utilities::WriteFile(FilesystemModule::Utilities::SettingsFileName(), doc);
-        }
-
-        
+        return settings;
     }
 
     static void ProcessSettingsFile(JsonDocument &doc)
     {
-        // JsonDocument &doc = FilesystemModule::Utilities::SettingsFile();
-        #if DEBUG == 1
-        // ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile");
-        // serializeJson(doc, Serial);
-        #endif
+        ESP_LOGI(TAG_COMPASS, "Processing settings file update");
 
         if (!doc.isNull())
         {
             // LED Module
-            int colorTheme = doc["Color Theme"]["cfgVal"].as<int>();
+            int colorTheme = doc["Color Theme"].as<int>();
 
-            uint8_t red = doc["Theme Red"]["cfgVal"].as<uint8_t>();
-            uint8_t green = doc["Theme Green"]["cfgVal"].as<uint8_t>();
-            uint8_t blue = doc["Theme Blue"]["cfgVal"].as<uint8_t>();
+            uint8_t red = doc["Theme Red"].as<uint8_t>();
+            uint8_t green = doc["Theme Green"].as<uint8_t>();
+            uint8_t blue = doc["Theme Blue"].as<uint8_t>();
 
             std::unordered_map<int, CRGB> presetThemeColors = 
             {
@@ -350,17 +236,14 @@ public:
             }
 
             LED_Utils::setThemeColor(color);
-            #if DEBUG == 1
             auto interfaceColor = LED_Pattern_Interface::ThemeColor();
-            ESP_LOGD(TAG_COMPASS, "LED Interface::ThemeColor: %d, %d, %d", interfaceColor.r, interfaceColor.g, interfaceColor.b);
-            #endif
+            ESP_LOGI(TAG_COMPASS, "LED Interface::ThemeColor: %d, %d, %d", interfaceColor.r, interfaceColor.g, interfaceColor.b);
 
             // Lora Module
-            LoraUtils::SetUserID(doc["UserID"].as<uint32_t>());
-            LoraUtils::SetUserName(doc["User Name"]["cfgVal"].as<std::string>());
-            LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"]["cfgVal"].as<uint8_t>());
+            LoraUtils::SetUserName(doc["User Name"].as<std::string>());
+            LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"].as<uint8_t>());
 
-            float frequency = doc["Frequency"]["cfgVal"].as<float>();
+            float frequency = doc["Frequency"].as<float>();
             // ArduinoLora.SetFrequency(frequency);
             ArduinoLora.SetSpreadingFactor(7);
             ArduinoLora.SetSignalBandwidth(125E3);
@@ -373,26 +256,22 @@ public:
             ArduinoLora.SetTXPower(23);
             #endif
 
-            // System
-            System_Utils::silentMode = doc["Silent Mode"].as<bool>();
-            System_Utils::time24Hour = doc["24H Time"].as<bool>();
-
             #if DEBUG == 1
             ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
             #endif
         }
     }
 
-    static void RegisterCallbacksDisplayManager(Display_Manager *unused)
-    {
-        // Display_Manager::registerCallback(ACTION_FLASH_DEFAULT_SETTINGS, FlashSettings);
-        // Display_Manager::registerCallback(ACTION_FLASH_LOCATIONS, FlashCampLocations);
-        // Display_Manager::registerCallback(ACTION_FLASH_MESSAGES, FlashMessages);
-        // Display_Manager::registerCallback(ACTION_CLEAR_LOCATIONS, ClearLocations);
-        // Display_Manager::registerCallback(ACTION_CLEAR_MESSAGES, ClearMessages);
+    // static void RegisterCallbacksDisplayManager(Display_Manager *unused)
+    // {
+    //     // Display_Manager::registerCallback(ACTION_FLASH_DEFAULT_SETTINGS, FlashSettings);
+    //     // Display_Manager::registerCallback(ACTION_FLASH_LOCATIONS, FlashCampLocations);
+    //     // Display_Manager::registerCallback(ACTION_FLASH_MESSAGES, FlashMessages);
+    //     // Display_Manager::registerCallback(ACTION_CLEAR_LOCATIONS, ClearLocations);
+    //     // Display_Manager::registerCallback(ACTION_CLEAR_MESSAGES, ClearMessages);
 
-        Display_Utils::UpdateDisplay() += UpdateDisplay;
-    }
+    //     Display_Utils::UpdateDisplay() += UpdateDisplay;
+    // }
 
     static void InitializeRpc(size_t rpcTaskPriority, size_t rpcTaskCore)
     {
@@ -487,134 +366,7 @@ public:
 
     static void UpdateDisplay()
     {
-        Display_Manager::display.display();
-    }
-
-    // Callbacks
-    static void FlashSettings(uint8_t inputID)
-    {
-        DynamicJsonDocument doc(2048);
-        JsonDocument &oldSettings = Settings_Manager::settings;
-
-        uint32_t userID = esp_random();
-        doc["UserID"] = userID;
-
-        // Default username is "User_xxxx" where xxxx is the last 2 bytes of the user ID in hex
-        char usernamebuffer[10];
-        sprintf(usernamebuffer, "User_%04X", userID & 0xFFFF);
-        std::string username = usernamebuffer;
-
-        JsonObject User_Name = doc.createNestedObject("User Name");
-        User_Name["cfgType"] = 10;
-        User_Name["cfgVal"] = usernamebuffer;
-        User_Name["dftVal"] = usernamebuffer;
-        User_Name["maxLen"] = 12;
-        doc["Silent Mode"] = false;
-
-        JsonObject Color_Theme = doc.createNestedObject("Color Theme");
-        Color_Theme["cfgType"] = 11;
-        Color_Theme["cfgVal"] = 0;
-        Color_Theme["dftVal"] = 0;
-
-        JsonArray Color_Theme_vals = Color_Theme.createNestedArray("vals");
-        Color_Theme_vals.add(0);
-        Color_Theme_vals.add(1);
-        Color_Theme_vals.add(2);
-        Color_Theme_vals.add(3);
-        Color_Theme_vals.add(4);
-        Color_Theme_vals.add(5);
-        Color_Theme_vals.add(6);
-        Color_Theme_vals.add(7);
-        Color_Theme_vals.add(8);
-
-        JsonArray Color_Theme_valTxt = Color_Theme.createNestedArray("valTxt");
-        Color_Theme_valTxt.add("Custom");
-        Color_Theme_valTxt.add("Red");
-        Color_Theme_valTxt.add("Green");
-        Color_Theme_valTxt.add("Blue");
-        Color_Theme_valTxt.add("Purple");
-        Color_Theme_valTxt.add("Yellow");
-        Color_Theme_valTxt.add("Cyan");
-        Color_Theme_valTxt.add("White");
-        Color_Theme_valTxt.add("Orange");
-
-        JsonObject Theme_Red = doc.createNestedObject("Theme Red");
-        Theme_Red["cfgType"] = 8;
-        Theme_Red["cfgVal"] = 0;
-        Theme_Red["dftVal"] = 0;
-        Theme_Red["maxVal"] = 255;
-        Theme_Red["minVal"] = 0;
-        Theme_Red["incVal"] = 1;
-        Theme_Red["signed"] = false;
-
-        JsonObject Theme_Green = doc.createNestedObject("Theme Green");
-        Theme_Green["cfgType"] = 8;
-        Theme_Green["cfgVal"] = 255;
-        Theme_Green["dftVal"] = 255;
-        Theme_Green["maxVal"] = 255;
-        Theme_Green["minVal"] = 0;
-        Theme_Green["incVal"] = 1;
-        Theme_Green["signed"] = false;
-
-        JsonObject Theme_Blue = doc.createNestedObject("Theme Blue");
-        Theme_Blue["cfgType"] = 8;
-        Theme_Blue["cfgVal"] = 0;
-        Theme_Blue["dftVal"] = 0;
-        Theme_Blue["maxVal"] = 255;
-        Theme_Blue["minVal"] = 0;
-        Theme_Blue["incVal"] = 1;
-        Theme_Blue["signed"] = false;
-
-        JsonObject Frequency = doc.createNestedObject("Frequency");
-        Frequency["cfgType"] = 9;
-        Frequency["cfgVal"] = 914.9;
-        Frequency["dftVal"] = 914.9;
-        Frequency["maxVal"] = 914.9;
-        Frequency["minVal"] = 902.3;
-        Frequency["incVal"] = 0.2;
-
-        JsonObject Modem_Config = doc.createNestedObject("Modem Config");
-        Modem_Config["cfgType"] = 11;
-        Modem_Config["cfgVal"] = 1;
-        Modem_Config["dftVal"] = 1 ;
-
-        JsonArray Modem_Config_vals = Modem_Config.createNestedArray("vals");
-        Modem_Config_vals.add(0);
-        Modem_Config_vals.add(1);
-        Modem_Config_vals.add(2);
-        Modem_Config_vals.add(3);
-        Modem_Config_vals.add(4);
-
-        JsonArray Modem_Config_valTxt = Modem_Config.createNestedArray("valTxt");
-        Modem_Config_valTxt.add("125 kHz, 4/5, 128");
-        Modem_Config_valTxt.add("500 kHz, 4/5, 128");
-        Modem_Config_valTxt.add("31.25 kHz, 4/8, 512");
-        Modem_Config_valTxt.add("125 kHz, 4/8, 4096");
-        Modem_Config_valTxt.add("125 khz, 4/5, 2048");
-
-        JsonObject Broadcast_Attempts = doc.createNestedObject("Broadcast Attempts");
-        Broadcast_Attempts["cfgType"] = 8;
-        Broadcast_Attempts["cfgVal"] = 3;
-        Broadcast_Attempts["dftVal"] = 3;
-        Broadcast_Attempts["maxVal"] = 5;
-        Broadcast_Attempts["minVal"] = 1;
-        Broadcast_Attempts["incVal"] = 1;
-        Broadcast_Attempts["signed"] = false;
-
-        doc["24H Time"] = false;
-
-        auto returncode = FilesystemModule::Utilities::WriteSettingsFile(SETTINGS_FILENAME, doc);
-        #if DEBUG == 1
-        ESP_LOGI(TAG_COMPASS, "FlashSettings: %d", returncode);
-        #endif  
-
-        if (inputID != 0)
-        {
-            Display_Utils::clearDisplay();
-            Display_Utils::printCenteredText("Settings Flashed!");
-            Display_Utils::UpdateDisplay().Invoke();
-            vTaskDelay(pdMS_TO_TICKS(2000));
-        }
+        display.display();
     }
 
     static void FlashMessages(uint8_t inputID)
@@ -655,6 +407,235 @@ public:
         manager->SendQueueTask();
     }
 
+    // Display Manager
+
+    static void InitializeDisplayManager()
+    {
+        display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+        display.clearDisplay();
+
+        display.setTextSize(1);
+        display.setTextColor(SSD1306_WHITE);
+        display.setCursor(0, 0);
+        display.display();
+
+        DisplayManagerInstance.init(static_cast<Adafruit_GFX *>(&display), OLED_WIDTH, OLED_HEIGHT); 
+
+        DisplayModule::initDefaultLayers();
+
+        // Wire up input draw commands
+        auto windowLayer = std::static_pointer_cast<DisplayModule::WindowLayer>(DisplayModule::Utilities::getLayer(DisplayModule::LayerID::WINDOW));
+
+        #if HARDWARE_VERSION == 1
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            if (inputText.empty()) return;
+
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd("^", fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            if (inputText.empty()) return;
+
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd("v", fmt);
+            cmd.draw(drawCtx);
+        });
+
+        #elif HARDWARE_VERSION == 2
+
+         windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            if (inputText.empty()) return;
+
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd("^", fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            if (inputText.empty()) return;
+
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd("v", fmt);
+            cmd.draw(drawCtx);
+        });
+
+        #endif
+
+        DisplayModule::Utilities::onRenderComplete += []()
+        {
+            display.display();
+        };
+
+        InitializeHomeWindow();
+    }
+
+    static void InitializeHomeWindow()
+    {
+        ESP_LOGI(TAG_COMPASS, "InitializeHomeWindow");
+        _homeWindowInstance = DisplayModule::HomeWindow::create(MainMenuFactory);
+
+        DisplayModule::Utilities::pushWindow(_homeWindowInstance);
+    }
+
+    static void MainMenuFactory(const DisplayModule::InputContext &ctx)
+    {
+        std::vector<DisplayModule::MenuItem> menuItems;
+
+        // Register Main Menu Items
+        menuItems.push_back(DisplayModule::MenuItem("Settings", SettingsWindowFactory));
+        menuItems.push_back(DisplayModule::MenuItem("Pair With Terminal", []()
+        {
+            auto wifiRpcWindow = std::make_shared<DisplayModule::WiFiRpcWindow>();
+            DisplayModule::Utilities::pushWindow(wifiRpcWindow);
+        }));
+        menuItems.push_back(DisplayModule::MenuItem("Edit Status Messages", []()
+        {
+            auto editStatusMessagesWindow = std::make_shared<DisplayModule::EditStatusMessagesWindow>();
+            DisplayModule::Utilities::pushWindow(editStatusMessagesWindow);
+        }));
+        menuItems.push_back(DisplayModule::MenuItem("Edit Saved Locations", []()
+        {
+            auto editSavedLocationsWindow = std::make_shared<DisplayModule::EditSavedLocationsWindow>();
+            DisplayModule::Utilities::pushWindow(editSavedLocationsWindow);
+        }));
+        menuItems.push_back(DisplayModule::MenuItem("Debug Compass", []()
+        {
+            auto compassWindow = std::make_shared<DisplayModule::CompassWindow>();
+            DisplayModule::Utilities::pushWindow(compassWindow);
+        }));
+        menuItems.push_back(DisplayModule::MenuItem("Debug GPS", []()
+        {
+            auto gpsWindow = std::make_shared<DisplayModule::GpsWindow>();
+            DisplayModule::Utilities::pushWindow(gpsWindow);
+        }));
+        menuItems.push_back(DisplayModule::MenuItem("Diagnostic Info", []()
+        {
+            auto diagnosticsWindow = std::make_shared<DisplayModule::DiagnosticsWindow>();
+            DisplayModule::Utilities::pushWindow(diagnosticsWindow);
+        }));
+        menuItems.push_back(DisplayModule::MenuItem("Reboot", []()
+        {
+            auto drawCtx = DisplayModule::Utilities::drawContext();
+            drawCtx.display->fillScreen(SSD1306_BLACK);
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
+            fmt.vAlign = DisplayModule::TextAlignV::CENTER;
+            DisplayModule::TextDrawCommand cmd("Rebooting...", fmt);
+            cmd.draw(drawCtx);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            ESP.restart();
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }));
+
+        auto mainMenuWindowPtr = DisplayModule::makeMenuWindow(menuItems);
+
+        DisplayModule::Utilities::pushWindow(mainMenuWindowPtr);
+    }
+
+    static void SettingsWindowFactory()
+    {
+        auto settingsWindowPtr = DisplayModule::makeSettingsWindow();   
+        DisplayModule::Utilities::pushWindow(settingsWindowPtr);
+    }
+
     private:
 
     const char * _TAG = "CompassUtils";
@@ -672,4 +653,6 @@ public:
             // server.end();
         }
     }
+
+    
 };
