@@ -167,13 +167,13 @@ public:
         auto colorTheme = std::make_shared<FilesystemModule::EnumSetting>("Theme Color", 2, colorThemeOptions, colorThemeValues);
         settings[colorTheme->key] = colorTheme;
 
-        auto themeRed = std::make_shared<FilesystemModule::IntSetting>("Theme Red", 0, 0, 255, 1);
+        auto themeRed = std::make_shared<FilesystemModule::IntSetting>("Theme Color Red", 0, 0, 255, 1);
         settings[themeRed->key] = themeRed;
 
-        auto themeGreen = std::make_shared<FilesystemModule::IntSetting>("Theme Green", 255, 0, 255, 1);
+        auto themeGreen = std::make_shared<FilesystemModule::IntSetting>("Theme Color Green", 255, 0, 255, 1);
         settings[themeGreen->key] = themeGreen;
 
-        auto themeBlue = std::make_shared<FilesystemModule::IntSetting>("Theme Blue", 0, 0, 255, 1);
+        auto themeBlue = std::make_shared<FilesystemModule::IntSetting>("Theme Color Blue", 0, 0, 255, 1);
         settings[themeBlue->key] = themeBlue;
 
         // TODO: dumb this down to walkie-talkie style channels
@@ -214,9 +214,9 @@ public:
             // LED Module
             int colorTheme = doc["Color Theme"].as<int>();
 
-            uint8_t red = doc["Theme Red"].as<uint8_t>();
-            uint8_t green = doc["Theme Green"].as<uint8_t>();
-            uint8_t blue = doc["Theme Blue"].as<uint8_t>();
+            uint8_t red = doc["Theme Color Red"].as<uint8_t>();
+            uint8_t green = doc["Theme Color Green"].as<uint8_t>();
+            uint8_t blue = doc["Theme Color Blue"].as<uint8_t>();
 
             std::unordered_map<int, CRGB> presetThemeColors = 
             {

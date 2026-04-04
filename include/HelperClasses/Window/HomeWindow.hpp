@@ -18,51 +18,6 @@
 
 namespace DisplayModule
 {
-    // -------------------------------------------------------------------------
-    // HomeWindow
-    // -------------------------------------------------------------------------
-    // The primary application window.  Owns all states used in the main
-    // interaction flow and wires the navigation between them.
-    //
-    // State machine (simplified):
-    //
-    //   HomeState (home screen)
-    //     ↓ BUTTON_1 ("Actions")    → SelectKeyValueState (quick-action menu)
-    //     ↓ BUTTON_2 ("Broadcast")  → SelectMessageState → RepeatMessageState
-    //     ↓ BUTTON_3 ("Lock")       → LockState
-    //     ↓ BUTTON_4 ("Main Menu")  → pushes a MenuWindow (external)
-    //     ↓ ENC_UP/DOWN             → cycles Home_Content view
-    //
-    //   LockState
-    //     ↓ sequence complete       → RepeatMessageState (SOS ping)
-    //     ↓ BUTTON_3               → back to HomeState
-    //
-    //   SelectMessageState
-    //     ↓ BUTTON_4 ("Send")       → RepeatMessageState with selected message
-    //     ↓ BUTTON_3 ("Back")       → back to HomeState
-    //
-    //   SelectLocationState
-    //     ↓ BUTTON_4 ("Select")     → TrackingState
-    //     ↓ BUTTON_3 ("Back")       → back to HomeState
-    //
-    //   TrackingState / RepeatMessageState
-    //     ↓ BUTTON_3 ("Back")       → back to HomeState
-    //
-    //   UnreadMessageState
-    //     ↓ BUTTON_4 ("Track")      → TrackingState
-    //     ↓ BUTTON_2 ("Reply")      → SelectMessageState
-    //     ↓ BUTTON_3 / scroll out   → back to HomeState
-    //
-    //   DisplaySentMessageState
-    //     ↓ BUTTON_4 ("Retransmit") → RepeatMessageState
-    //     ↓ BUTTON_3 ("Back")       → back to HomeState
-    //
-    // Usage:
-    //   Factory method wires the main-menu callback without subclassing:
-    //   auto win = HomeWindow::create([&]() { Utilities::pushWindow(myMenuWindow); });
-    //   Utilities::pushWindow(win);
-
-
     class HomeWindow : public Window
     {
     public:
@@ -102,7 +57,6 @@ namespace DisplayModule
             _selectMsgState    = std::make_shared<SelectMessageState>();
             _selectLocState    = std::make_shared<SelectLocationState>();
             _unreadState       = std::make_shared<UnreadMessageState>();
-            // Is this needed?
             _selectKVState     = std::make_shared<SelectKeyValueState>();
             _sentMsgState      = std::make_shared<DisplaySentMessageState>();
             _repeatState       = std::make_shared<RepeatMessageState>();
@@ -410,7 +364,7 @@ namespace DisplayModule
             });
 
             _viewMessageState->bindInput(InputID::BUTTON_4, "Save", [this](const InputContext &ctx) {
-                
+                pushState(_selectKVState);
             });
         }
 
@@ -486,6 +440,7 @@ namespace DisplayModule
                     drawCtx.display->fillScreen(BLACK);
                     auto successMsg = TextDrawCommand("Message saved", TextFormat{TextAlignH::CENTER, TextAlignV::CENTER});
                     successMsg.draw(drawCtx);
+                    Utilities::onRenderComplete();
                     vTaskDelay(pdMS_TO_TICKS(2000));
                 }
                 else if (selectedKey == "Location")
@@ -504,8 +459,12 @@ namespace DisplayModule
                     drawCtx.display->fillScreen(BLACK);
                     auto successMsg = TextDrawCommand("Location saved", TextFormat{TextAlignH::CENTER, TextAlignV::CENTER});
                     successMsg.draw(drawCtx);
+                    Utilities::onRenderComplete();
                     vTaskDelay(pdMS_TO_TICKS(2000));
                 }
+
+                popState();
+                popState();
             });
         }
 
