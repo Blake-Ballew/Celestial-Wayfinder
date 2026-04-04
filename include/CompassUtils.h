@@ -194,6 +194,9 @@ public:
         auto wifiProvisioning = std::make_shared<FilesystemModule::EnumSetting>("WiFi Mode", 0, wifiOptions, wifiValues);
         settings[wifiProvisioning->key] = wifiProvisioning;
 
+        auto wifiapPassword = std::make_shared<FilesystemModule::StringSetting>("WiFi AP Password", "esp-pass", 21);
+        settings[wifiapPassword->key] = wifiapPassword;
+
         for (const auto& setting : settings)
         {
             setting.second->loadFromPreferences(FilesystemModule::Utilities::SettingsPreference());
@@ -587,7 +590,7 @@ public:
         menuItems.push_back(DisplayModule::MenuItem("Settings", SettingsWindowFactory));
         menuItems.push_back(DisplayModule::MenuItem("Configure via WiFi", []()
         {
-            auto wifiRpcWindow = std::make_shared<DisplayModule::WiFiRpcWindow>();
+            auto wifiRpcWindow = std::make_shared<DisplayModule::WiFiRpcWindow>(true);
             DisplayModule::Utilities::pushWindow(wifiRpcWindow);
         }));
         menuItems.push_back(DisplayModule::MenuItem("Configure via BT", []()
@@ -654,6 +657,8 @@ public:
         if ((int)event == (int)SYSTEM_EVENT_STA_GOT_IP ||
             (int)event == (int)ARDUINO_EVENT_WIFI_AP_START)
         {
+            ESP_LOGI(TAG, "WiFi event fired, waiting for stack to stabilize...");
+            vTaskDelay(pdMS_TO_TICKS(500));  // Critical: let AP interface fully initialize
             ESP_LOGI(TAG, "WiFi connected, starting RPC server");
             WebServerInstance.begin();
         }
