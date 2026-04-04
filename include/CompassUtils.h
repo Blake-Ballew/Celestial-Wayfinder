@@ -32,6 +32,7 @@
 #include "EditSavedLocationsWindow.hpp"
 #include "EditStatusMessagesWindow.hpp"
 #include "WiFiRpcWindow.hpp"
+#include "PairBluetoothWindow.hpp"
 
 static const char *TAG_COMPASS = "COMPASS";
 
@@ -122,6 +123,7 @@ public:
             ESP_LOGI(TAG_COMPASS, "Generated new UserID: %u", userID);
         }
 
+        // Not sure these are necessary
         if (!deviceInfo.isKey("Firmware") || deviceInfo.getString("Firmware").c_str() != std::string(FIRMWARE_VERSION_STRING))
         {
             deviceInfo.putString("Firmware", FIRMWARE_VERSION_STRING);
@@ -133,6 +135,8 @@ public:
             deviceInfo.putInt("Hardware", HARDWARE_VERSION);
             ESP_LOGI(TAG_COMPASS, "Set Hardware Version: %d", HARDWARE_VERSION);
         }
+
+        System_Utils::DeviceID = deviceInfo.getUInt("UserID");
     }
 
     static std::map<std::string, std::shared_ptr<FilesystemModule::SettingsInterface>> GenerateSettings()
@@ -581,10 +585,15 @@ public:
 
         // Register Main Menu Items
         menuItems.push_back(DisplayModule::MenuItem("Settings", SettingsWindowFactory));
-        menuItems.push_back(DisplayModule::MenuItem("Pair With Terminal", []()
+        menuItems.push_back(DisplayModule::MenuItem("Configure via WiFi", []()
         {
             auto wifiRpcWindow = std::make_shared<DisplayModule::WiFiRpcWindow>();
             DisplayModule::Utilities::pushWindow(wifiRpcWindow);
+        }));
+        menuItems.push_back(DisplayModule::MenuItem("Configure via BT", []()
+        {
+            auto btRpcWindow = std::make_shared<DisplayModule::PairBluetoothWindow>();
+            DisplayModule::Utilities::pushWindow(btRpcWindow);
         }));
         menuItems.push_back(DisplayModule::MenuItem("Edit Status Messages", []()
         {
@@ -642,14 +651,14 @@ public:
 
     static void EnableServerOnWiFiConnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
-        if((int)event == (int)SYSTEM_EVENT_STA_GOT_IP) 
+        if ((int)event == (int)SYSTEM_EVENT_STA_GOT_IP ||
+            (int)event == (int)ARDUINO_EVENT_WIFI_AP_START)
         {
-            // Start server now that Wi-Fi is ready
+            ESP_LOGI(TAG, "WiFi connected, starting RPC server");
             WebServerInstance.begin();
-        } 
-        else if((int)event == (int)SYSTEM_EVENT_STA_DISCONNECTED) 
+        }
+        else if ((int)event == (int)SYSTEM_EVENT_STA_DISCONNECTED)
         {
-            // Optionally, you could stop the server if you like:
             // server.end();
         }
     }

@@ -488,6 +488,24 @@ namespace DisplayModule
                     successMsg.draw(drawCtx);
                     vTaskDelay(pdMS_TO_TICKS(2000));
                 }
+                else if (selectedKey == "Location")
+                {
+                    auto msg = _viewMessageState->currentMessage();
+                    auto pingMsg = static_cast<MessagePing *>(msg);
+
+                    SavedLocation loc;
+                    loc.Name = pingMsg->status;
+                    loc.Latitude = pingMsg->lat;
+                    loc.Longitude = pingMsg->lng;
+
+                    NavigationUtils::AddSavedLocation(loc, true);
+                    popState(); 
+                    auto &drawCtx = Utilities::drawContext();
+                    drawCtx.display->fillScreen(BLACK);
+                    auto successMsg = TextDrawCommand("Location saved", TextFormat{TextAlignH::CENTER, TextAlignV::CENTER});
+                    successMsg.draw(drawCtx);
+                    vTaskDelay(pdMS_TO_TICKS(2000));
+                }
             });
         }
 
