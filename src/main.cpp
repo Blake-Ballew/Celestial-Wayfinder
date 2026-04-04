@@ -8,6 +8,8 @@
 #include <ESP32Encoder.h>
 #include "globalDefines.h"
 
+#include <ArduinoJson.hpp>
+
 #include "Display_Manager.h"
 #include "Settings_Manager.h"
 #include "LoraManager.h"
@@ -27,6 +29,8 @@
 #include "Ring_Pulse.h"
 
 #include "MessagePing.h"
+
+#include <unordered_map>
 
 extern "C"
 {
