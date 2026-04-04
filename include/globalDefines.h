@@ -2,11 +2,6 @@
 
 #define CONFIG_SOC_IEEE802154_SUPPORTED y
 
-#define BUZZER_PIN 4
-#define DEFAULT_TONE 1000
-
-#define BATT_SENSE_PIN 39
-
 #define ENC_A 23
 #define ENC_B 2
 
@@ -38,8 +33,6 @@
 
 #define COMPASS_DRDY_PIN 35
 
-#define KEEP_ALIVE_PIN 5
-
 #if HARDWARE_VERSION == 1
 #define OLED_HEIGHT 32
 #endif
@@ -61,9 +54,6 @@
 #define BUTTON_TEXT_MAX 12
 #define NODE_TEXT_MAX 32
 
-#define FORMAT_SPIFFS_IF_FAILED true
-#define USE_SPIFFS 1
-
 #define SIZE_SETTINGS_OBJECT 4096
 #define SIZE_SAVED_MESSAGES_OBJECT 4096
 #define SIZE_COORDS_OBJECT 8192
@@ -78,18 +68,21 @@
 
 #if HARDWARE_VERSION == 1
 #define NUM_LEDS 30
+#define LED_PIN 27
 #endif
 
 #if HARDWARE_VERSION == 2
 #define NUM_LEDS 31
+#define LED_PIN 27
 #endif
 
 // TODO: Change this
 #if HARDWARE_VERSION == 3
-#define NUM_LEDS 31
+#define NUM_LEDS 60
+#define LED_PIN 16
+#define AUX_LED_ENABLE_PIN 15
 #endif
 
-#define LED_PIN 27
 #define LED_TYPE WS2812B
 #define LED_ORDER GRB
 

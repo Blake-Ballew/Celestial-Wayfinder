@@ -75,6 +75,8 @@ void setup()
 
   bootloader_random_enable();
 
+  auto BATT_SENSE_PIN = 39;
+
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
   pinMode(BUTTON_SOS_PIN, INPUT_PULLUP);
@@ -97,7 +99,7 @@ void setup()
   CompassUtils::InitializeSettings();
 
   // Initialize LED Module
-  LED_Manager::init(NUM_LEDS, CPU_CORE_APP);
+  CompassUtils::InitializeLedManager(CPU_CORE_APP);
 
   vTaskDelay(300);
 
