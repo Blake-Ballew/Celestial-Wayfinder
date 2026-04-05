@@ -39,15 +39,31 @@ namespace
 {
   const uint8_t CPU_CORE_LORA = 1;
   const uint8_t CPU_CORE_APP = 0;
+  const uint8_t RF95_TX_PWR = 20;
+
+  #if HARDWARE_VERSION < 3
   const uint8_t LORA_CS = 15;
   const uint8_t LORA_RST = -1;
   const uint8_t LORA_DIO0 = 18;
-  const uint8_t RF95_TX_PWR = 20;
+  #else
+  const uint8_t LORA_CS = 39;
+  const uint8_t LORA_RST = 38;
+  const uint8_t LORA_DIO0 = 48;
+  const uint8_t LORA_SCK = 40;
+  const uint8_t LORA_MISO = 42;
+  const uint8_t LORA_MOSI = 41;
+
+  #endif
 }
+
+#if HARDWARE_VERSION < 3
+SPIClass loraSpi(HSPI);
+#else
+SPIClass loraSpi;
+#endif
 
 ESP32Encoder encoder(true, enc_cb);
 
-SPIClass loraSpi(HSPI);
 ArduinoLoRaDriver CompassUtils::ArduinoLora(&loraSpi, LORA_CS, LORA_RST, LORA_DIO0, 915E6);
 LoraManager loraManager(&CompassUtils::ArduinoLora);
 
@@ -56,7 +72,6 @@ CompassInterface *compass;
 NavigationManager navigationManager;
 
 // Filesytstem Manager. May not even need this
-
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
@@ -71,10 +86,6 @@ void setup()
 
   bootloader_random_enable();
 
-  auto BATT_SENSE_PIN = 39;
-
-
-
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
   pinMode(BUTTON_SOS_PIN, INPUT_PULLUP);
@@ -85,6 +96,7 @@ void setup()
   pinMode(BUZZER_PIN, OUTPUT);
 
 #if HARDWARE_VERSION < 3
+  auto BATT_SENSE_PIN = 39;
   pinMode(BATT_SENSE_PIN, INPUT);
 #endif
 
@@ -135,6 +147,9 @@ void setup()
   navigationManager.InitializeUtils(compass, Serial2);
 
   // Initialize Lora Module
+  #if HARDWARE_VERSION == 3
+  loraSpi.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
+  #endif
   auto success = loraManager.Init();
 
 #if DEBUG == 1
