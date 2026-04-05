@@ -143,21 +143,19 @@ void IRAM_ATTR enc_cb(void *arg)
         command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
         if (currCount > prevCount)
         {
-            #if HARDWARE_VERSION == 1
+#if HARDWARE_VERSION == 1
             command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
-            #endif
-            #if HARDWARE_VERSION == 2
+#else
             command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
-            #endif
+#endif
         }
         else if (currCount < prevCount)
         {
-            #if HARDWARE_VERSION == 1
+#if HARDWARE_VERSION == 1
             command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
-            #endif
-            #if HARDWARE_VERSION == 2
+#else
             command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
-            #endif
+#endif
         }
         else
         {
