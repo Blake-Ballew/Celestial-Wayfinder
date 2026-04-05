@@ -504,7 +504,73 @@ public:
 
         #elif HARDWARE_VERSION == 2
 
-         windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd(inputText, fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            if (inputText.empty()) return;
+
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
+            fmt.vAlign = DisplayModule::TextAlignV::TOP;
+
+            DisplayModule::TextDrawCommand cmd("^", fmt);
+            cmd.draw(drawCtx);
+        });
+
+        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
+        {
+            if (inputText.empty()) return;
+
+            DisplayModule::TextFormat fmt;
+            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
+            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
+
+            DisplayModule::TextDrawCommand cmd("v", fmt);
+            cmd.draw(drawCtx);
+        });
+
+        #elif HARDWARE_VERSION == 3
+
+        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
         {
             DisplayModule::TextFormat fmt;
             fmt.hAlign = DisplayModule::TextAlignH::LEFT;
