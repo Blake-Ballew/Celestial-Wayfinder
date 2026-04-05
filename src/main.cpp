@@ -35,11 +35,6 @@ extern "C"
 #include "bootloader_random.h"
 }
 
-#if DEBUG == 1
-TaskHandle_t debugInputTaskHandle;
-void sendDebugInputs(void *pvParameters);
-#endif
-
 namespace
 {
   const uint8_t CPU_CORE_LORA = 1;
@@ -289,26 +284,4 @@ void enterUselessLoop()
     vTaskDelay(3000);
   }
 }
-
-#if DEBUG == 1
-// Takes in a numeric input over serial, shifts a bit by that much, and sends it to the inputTaskHandle
-void sendDebugInputs(void *pvParameters)
-{
-  int input;
-  while (1)
-  {
-    if (Serial.available() > 0)
-    {
-      input = Serial.parseInt();
-      ESP_LOGD(TAG, "Passing in input: %d", input);
-      DisplayCommandQueueItem command;
-      command.commandType = INPUT_COMMAND;
-      command.commandData.inputCommand.inputID = input;
-      xQueueSend(displayCommandQueue, &command, portMAX_DELAY);
-    }
-    vTaskDelay(50 / portTICK_PERIOD_MS);
-  }
-}
-#endif
-
 

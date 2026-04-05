@@ -2,7 +2,6 @@
 
 #include <FastLED.h>
 
-#include "Display_Utils.h"
 #include "LoraManager.h"
 #include "FilesystemUtils.h"
 #include "RpcUtils.h"
@@ -356,6 +355,7 @@ public:
         // System
         RpcModule::Utilities::RegisterRpc("RestartSystem", [](JsonDocument &_) { ESP.restart();  vTaskDelay(1000 / portTICK_PERIOD_MS); });
         RpcModule::Utilities::RegisterRpc("GetSystemInfo", System_Utils::GetSystemInfoRpc);
+        RpcModule::Utilities::RegisterRpc("GetDisplayContents", GetDisplayContentsRpc);
 
         // Receive WiFi Credentials
         RpcModule::Utilities::RegisterRpc("BroadcastWifiCredentials", [](JsonDocument &doc) 
@@ -375,22 +375,6 @@ public:
     static void UpdateDisplay()
     {
         display.display();
-    }
-
-    static void FlashMessages(uint8_t inputID)
-    {
-        Display_Utils::clearDisplay();
-        Display_Utils::printCenteredText("Flashing Messages...");
-        Display_Utils::UpdateDisplay().Invoke();
-
-
-        LoraUtils::AddSavedMessage("Ping", false);
-
-
-        Display_Utils::clearDisplay();
-        Display_Utils:: printCenteredText("Messages Flashed!");
-        Display_Utils::UpdateDisplay().Invoke();
-        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 
     static void ClearLocations(uint8_t inputID)
@@ -413,6 +397,25 @@ public:
     {
         LoraManager *manager = (LoraManager *)pvParameters;
         manager->SendQueueTask();
+    }
+
+    static void GetDisplayContentsRpc(JsonDocument &doc)
+    {
+        doc["width"] = display.width();
+        doc["height"] = display.height();
+
+        size_t bufferLength = (display.width() * display.height()) / 8;
+        uint8_t* displayBuffer = display.getBuffer();
+
+        // 128x128 resolution = 2048 bytes, b64 encoded = 2730 chars
+        unsigned char contents[3000];
+        size_t b64_len = 0;
+        auto res = mbedtls_base64_encode(contents, sizeof(contents), &b64_len, displayBuffer, bufferLength);
+        ESP_LOGI(TAG, "Encoded buffer of size %d into %d b64 bytes (res=%d)", bufferLength, b64_len, res);
+
+        if (res == 0) {
+            doc["buffer"] = String(contents, b64_len);
+        }
     }
 
     // Display Manager
