@@ -52,7 +52,7 @@ namespace
     #if HARDWARE_VERSION < 3
     Adafruit_SSD1306 display = Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire);
     #elif HARDWARE_VERSION == 3
-    #ifdef USE_V3_OLED
+    #ifdef USE_V3_OLED   
     Adafruit_SSD1327 display = Adafruit_SSD1327(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
     #else
     GFXcanvas1 display = GFXcanvas1(OLED_WIDTH, OLED_HEIGHT);
@@ -649,21 +649,25 @@ public:
 #else
 #ifdef USE_V3_OLED
         ESP_LOGI(TAG, "Initializing SSD1327...");
-        auto result = display.begin(SSD1327_I2C_ADDRESS);
+        auto result = display.begin(0x3C);
 
         if (result)
         {
             ESP_LOGI(TAG, "SSD1327 Initialized.");
+            display.setRotation(2);
             display.clearDisplay();
+            display.setContrast(0x7F);
+            display.setTextColor(SSD1327_WHITE);
         }
         else
         {
             ESP_LOGW(TAG, "SSD1327 Failed to initialize.");
         }
-        
-#endif
-        display.setTextSize(1);
+#else
         display.setTextColor(WHITE);
+#endif
+
+        display.setTextSize(1);
         display.setCursor(0, 0);
         return static_cast<Adafruit_GFX *>(&display);
 #endif

@@ -123,8 +123,16 @@ void setup()
 
   vTaskDelay(300);
 
-  #if HARDWARE_VERSON == 3
-  Wire.begin(18, 17);
+  #if HARDWARE_VERSION == 3
+  auto wireSuccess = Wire.begin(18, 17);
+  if (wireSuccess)
+  {
+    ESP_LOGI(TAG, "Successfully initialized display I2C");
+  }
+  else
+  {
+    ESP_LOGW(TAG, "Failed to init display I2C");
+  }
   #endif
 
   // Intialize Navigation Module
