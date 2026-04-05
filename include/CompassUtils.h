@@ -1,7 +1,10 @@
 #pragma once
 
 #include <FastLED.h>
+
+#ifdef USE_V3_OLED
 #include "Adafruit_SSD1327.h"
+#endif
 
 #include "LoraManager.h"
 #include "FilesystemUtils.h"
