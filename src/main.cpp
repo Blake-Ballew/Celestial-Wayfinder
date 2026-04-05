@@ -8,8 +8,8 @@
 #include <ESP32Encoder.h>
 #include "globalDefines.h"
 
-#include "Display_Manager.h"
-#include "Settings_Manager.h"
+#include <ArduinoJson.hpp>
+
 #include "LoraManager.h"
 #include "NavigationManager.h"
 
@@ -27,6 +27,8 @@
 #include "Ring_Pulse.h"
 
 #include "MessagePing.h"
+
+#include <unordered_map>
 
 extern "C"
 {
@@ -58,15 +60,20 @@ NavigationManager navigationManager;
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
+void enterUselessLoop();
 
 void setup()
 {
-#if DEBUG == 1
   Serial.begin(115200);
+  vTaskDelay(1000);
   ESP_LOGI(TAG, "Initializing Hardware Version %d", HARDWARE_VERSION);
-#endif
+
 
   bootloader_random_enable();
+
+  auto BATT_SENSE_PIN = 39;
+
+
 
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
@@ -76,9 +83,13 @@ void setup()
   pinMode(BUTTON_3_PIN, INPUT_PULLUP);
   pinMode(BUTTON_4_PIN, INPUT);
   pinMode(BUZZER_PIN, OUTPUT);
+
+#if HARDWARE_VERSION < 3
   pinMode(BATT_SENSE_PIN, INPUT);
+#endif
 
 #if HARDWARE_VERSION == 1
+  auto KEEP_ALIVE_PIN = 5;
   pinMode(KEEP_ALIVE_PIN, OUTPUT);  
   digitalWrite(KEEP_ALIVE_PIN, HIGH);
 #endif
@@ -89,8 +100,10 @@ void setup()
   
   CompassUtils::InitializeSettings();
 
+  // enterUselessLoop();
+
   // Initialize LED Module
-  LED_Manager::init(NUM_LEDS, CPU_CORE_APP);
+  CompassUtils::InitializeLedManager(CPU_CORE_APP);
 
   vTaskDelay(300);
 
@@ -112,10 +125,12 @@ void setup()
   compass = new LSM303AGR();
 #endif
 
-  #if DEBUG == 1
   ESP_LOGI(TAG, "Initializing Navigation Manager");
-  #endif
+
   // Initialize GPS Stream
+  #if HARDWARE_VERSION == 3
+  Serial2.setPins(5, 4);
+  #endif
   Serial2.begin(9600);
   navigationManager.InitializeUtils(compass, Serial2);
 
@@ -260,4 +275,14 @@ void disableInterruptsHandler()
   inputEncoder->pauseCount();
 }
 
+void enterUselessLoop()
+{
+  auto counter = 0;
+
+  while(true)
+  {
+    ESP_LOGI("SETUP", "Infinite loop: %d\n", counter);
+    vTaskDelay(3000);
+  }
+}
 

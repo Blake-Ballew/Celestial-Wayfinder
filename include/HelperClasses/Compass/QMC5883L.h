@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <QMC5883LCompass.h>
 #include "esp_log.h"
+#include "ArduinoJson.hpp"
 
 static const char *TAG_COMPASS_QMC = "COMPASS";
 

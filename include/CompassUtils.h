@@ -1,10 +1,11 @@
 #pragma once
 
+#include <FastLED.h>
+
 #include "LoraManager.h"
 #include "FilesystemUtils.h"
 #include "RpcUtils.h"
 #include "LED_Utils.h"
-#include "Settings_Manager.h"
 #include "FilesystemManager.h"
 #include "EspNowManager.h"
 #include "Display_Manager.h"
@@ -649,6 +650,21 @@ public:
     {
         auto settingsWindowPtr = DisplayModule::makeSettingsWindow();   
         DisplayModule::Utilities::pushWindow(settingsWindowPtr);
+    }
+
+    static void InitializeLedManager(uint8_t cpuCore = 0)
+    {
+        auto leds = new CRGB[NUM_LEDS];
+
+        #if HARDWARE_VERSION == 1
+            FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+        #elif HARDWARE_VERSION == 2
+            FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+        #elif HARDWARE_VERSION == 3
+            FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+        #endif
+
+        LED_Manager::init(NUM_LEDS, leds, cpuCore);
     }
 
     private:
