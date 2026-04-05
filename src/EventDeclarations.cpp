@@ -129,7 +129,7 @@ void IRAM_ATTR enc_cb(void *arg)
         }
     */
     int64_t currCount = enc->getCount();
-    if (currCount % 4 == 0)
+    if (currCount % 2 == 0)
     {
         static TickType_t lastISRTime = 0;
         if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_ENC)
