@@ -2,34 +2,40 @@
 
 #define CONFIG_SOC_IEEE802154_SUPPORTED y
 
+#if HARDWARE_VERSION < 3
 #define ENC_A 23
 #define ENC_B 2
+#else
+#define ENC_A 10
+#define ENC_B 9
+#endif
 
-// #define BUTTON_1 1
-// #define BUTTON_2 2
-// #define BUTTON_3 3
-// #define BUTTON_4 4
-// #define ENC_DOWN 5
-// #define ENC_UP 6
 #define MESSAGE_RECEIVED 7
 #define BUTTON_SOS 8
 
 #if HARDWARE_VERSION == 1
 #define BUTTON_1_PIN 36
-#endif
-
-#if HARDWARE_VERSION == 2
-#define BUTTON_1_PIN 5
-#endif
-
-#if HARDWARE_VERSION == 3
-#define BUTTON_1_PIN 5
-#endif
-
 #define BUTTON_2_PIN 26
 #define BUTTON_3_PIN 19
 #define BUTTON_4_PIN 34
 #define BUTTON_SOS_PIN 25
+#endif
+
+#if HARDWARE_VERSION == 2
+#define BUTTON_1_PIN 5
+#define BUTTON_2_PIN 26
+#define BUTTON_3_PIN 19
+#define BUTTON_4_PIN 34
+#define BUTTON_SOS_PIN 25
+#endif
+
+#if HARDWARE_VERSION == 3
+#define BUTTON_1_PIN 13
+#define BUTTON_2_PIN 3
+#define BUTTON_3_PIN 12
+#define BUTTON_4_PIN 11
+#define BUTTON_SOS_PIN 8
+#endif
 
 #define COMPASS_DRDY_PIN 35
 
