@@ -20,27 +20,24 @@ public:
 
     bool Init()
     {
+        ESP_LOGI(TAG_LORA, "Initializing LoRa...");
         if (_spi == nullptr)
         {
+            ESP_LOGW(TAG_LORA, "No valid Spi bus detected");
             return false;
         }
 
-        #if DEBUG == 1
-        ESP_LOGI(TAG_LORA, "Initializing LoRa...");
         ESP_LOGI(TAG_LORA, "CS: %d", _cs);
         ESP_LOGI(TAG_LORA, "RESET: %d", _reset);
         ESP_LOGI(TAG_LORA, "DIO0: %d", _dio0);
-        #endif
 
         LoRa.setPins(_cs, _reset, _dio0);
         LoRa.setSPI(*_spi);
 
-        #if DEBUG == 1
         ESP_LOGI(TAG_LORA, "Beginning LoRa...");
-        #endif
+
         auto result = LoRa.begin(_loraFrequency) == 1;
 
-        #if DEBUG == 1
         if (result)
         {
             ESP_LOGI(TAG_LORA, "Success");
@@ -49,7 +46,6 @@ public:
         {
             ESP_LOGE(TAG_LORA, "Failed");
         }
-        #endif
 
         LoRa.setCodingRate4(8);
         LoRa.setSpreadingFactor(7);
