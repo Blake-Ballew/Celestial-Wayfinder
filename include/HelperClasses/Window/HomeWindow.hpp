@@ -468,8 +468,6 @@ namespace DisplayModule
             });
         }
 
-
-
         void _openLocationSelector(const InputContext &ctx)
         {
             auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(2048);
@@ -515,23 +513,6 @@ namespace DisplayModule
             d.inputID = ctx.inputID;
             d.payload = preselectPayload;
             switchState(_selectMsgState, d);
-        }
-
-        // void _startTracking(const InputContext &ctx)
-        // {
-        //     auto payload = std::make_shared<ArduinoJson::DynamicJsonDocument>(256);
-        //     _selectLocState->buildSelectPayload(payload);
-
-        //     StateTransferData d;
-        //     d.inputID = ctx.inputID;
-        //     d.payload = payload;
-        //     switchState(_trackingState, d);
-        // }
-
-        void _handleQuickAction(const InputContext &)
-        {
-            // SelectKeyValueState result handling — application-layer subclass
-            // can override onMainMenuRequested or hook into this
         }
 
         void _buildActionMenu(std::vector<DisplayModule::MenuItem> &menuItems)

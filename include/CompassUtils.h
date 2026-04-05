@@ -1,6 +1,7 @@
 #pragma once
 
 #include <FastLED.h>
+#include "Adafruit_SSD1327.h"
 
 #include "LoraManager.h"
 #include "FilesystemUtils.h"
@@ -50,8 +51,12 @@ namespace
 
     #if HARDWARE_VERSION < 3
     Adafruit_SSD1306 display = Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire);
+    #elif HARDWARE_VERSION == 3
+    #ifdef USE_V3_OLED
+    Adafruit_SSD1327 display = Adafruit_SSD1327(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
     #else
     GFXcanvas1 display = GFXcanvas1(OLED_WIDTH, OLED_HEIGHT);
+    #endif
     #endif
 }
 
@@ -619,7 +624,7 @@ public:
 
 #endif
 
-#if HARDWARE_VERSION < 3
+#if HARDWARE_VERSION < 3 || defined(USE_V3_OLED)
         DisplayModule::Utilities::onRenderComplete += []()
         {
             display.display();
@@ -642,6 +647,21 @@ public:
 
         return static_cast<Adafruit_GFX *>(&display);
 #else
+#ifdef USE_V3_OLED
+        ESP_LOGI(TAG, "Initializing SSD1327...");
+        auto result = display.begin(SSD1327_I2C_ADDRESS);
+
+        if (result)
+        {
+            ESP_LOGI(TAG, "SSD1327 Initialized.");
+            display.clearDisplay();
+        }
+        else
+        {
+            ESP_LOGW(TAG, "SSD1327 Failed to initialize.");
+        }
+        
+#endif
         display.setTextSize(1);
         display.setTextColor(WHITE);
         display.setCursor(0, 0);

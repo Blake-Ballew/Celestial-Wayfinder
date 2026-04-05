@@ -92,7 +92,11 @@ void setup()
   pinMode(BUTTON_1_PIN, INPUT_PULLUP);
   pinMode(BUTTON_2_PIN, INPUT_PULLUP);
   pinMode(BUTTON_3_PIN, INPUT_PULLUP);
+#if HARDWARE_VERSION == 1 || HARDWARE_VERSION == 2
   pinMode(BUTTON_4_PIN, INPUT);
+#else
+  pinMode(BUTTON_4_PIN, INPUT_PULLUP);
+#endif
   pinMode(BUZZER_PIN, OUTPUT);
 
 #if HARDWARE_VERSION < 3
@@ -118,6 +122,10 @@ void setup()
   CompassUtils::InitializeLedManager(CPU_CORE_APP);
 
   vTaskDelay(300);
+
+  #if HARDWARE_VERSON == 3
+  Wire.begin(18, 17);
+  #endif
 
   // Intialize Navigation Module
   // Initialize Compass
@@ -159,7 +167,6 @@ void setup()
   }
 #endif
 
-  // TODO remove home window from here
   CompassUtils::InitializeDisplayManager();
 
   System_Utils::init();
