@@ -48,7 +48,11 @@ namespace
     static AsyncCorsMiddleware cors;
     static std::shared_ptr<DisplayModule::HomeWindow> _homeWindowInstance;
 
+    #if HARDWARE_VERSION < 3
     Adafruit_SSD1306 display = Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire);
+    #else
+    GFXcanvas1 display = GFXcanvas1(OLED_WIDTH, OLED_HEIGHT);
+    #endif
 }
 
 // Static class to help interface with esp32 utils compass functionality
@@ -269,17 +273,6 @@ public:
         }
     }
 
-    // static void RegisterCallbacksDisplayManager(Display_Manager *unused)
-    // {
-    //     // Display_Manager::registerCallback(ACTION_FLASH_DEFAULT_SETTINGS, FlashSettings);
-    //     // Display_Manager::registerCallback(ACTION_FLASH_LOCATIONS, FlashCampLocations);
-    //     // Display_Manager::registerCallback(ACTION_FLASH_MESSAGES, FlashMessages);
-    //     // Display_Manager::registerCallback(ACTION_CLEAR_LOCATIONS, ClearLocations);
-    //     // Display_Manager::registerCallback(ACTION_CLEAR_MESSAGES, ClearMessages);
-
-    //     Display_Utils::UpdateDisplay() += UpdateDisplay;
-    // }
-
     static void InitializeRpc(size_t rpcTaskPriority, size_t rpcTaskCore)
     {
         // Allow CORS requests for RPC server.
@@ -370,11 +363,6 @@ public:
                 }
             }
         });
-    }
-
-    static void UpdateDisplay()
-    {
-        display.display();
     }
 
     static void ClearLocations(uint8_t inputID)
@@ -654,8 +642,10 @@ public:
 
         return static_cast<Adafruit_GFX *>(&display);
 #else
-        auto displayPtr = new GFXcanvas1(OLED_WIDTH, OLED_HEIGHT);
-        return static_cast<Adafruit_GFX *>(displayPtr);
+        display.setTextSize(1);
+        display.setTextColor(WHITE);
+        display.setCursor(0, 0);
+        return static_cast<Adafruit_GFX *>(&display);
 #endif
     }
 
