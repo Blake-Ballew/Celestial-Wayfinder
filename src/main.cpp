@@ -89,6 +89,7 @@ void setup()
 #endif
 
 #if HARDWARE_VERSION == 1
+  auto KEEP_ALIVE_PIN = 5;
   pinMode(KEEP_ALIVE_PIN, OUTPUT);  
   digitalWrite(KEEP_ALIVE_PIN, HIGH);
 #endif
