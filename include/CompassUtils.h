@@ -1,7 +1,20 @@
 #pragma once
 
-#include <FastLED.h>
+#if HARDWARE_VERSION == 1
+    #include "Bootstrap/V1/BootstrapLeds.hpp"
+#elif HARDWARE_VERSION == 2
+    #include "Bootstrap/V2/BootstrapLeds.hpp"
+#elif HARDWARE_VERSION == 3
+    #include "Bootstrap/V3/BootstrapLeds.hpp"
+#else
+    #error "Unknown HARDWARE_VERSION. Must be 1, 2, or 3."
+#endif
+
+#ifdef USE_V3_OLED
 #include "Adafruit_SSD1327.h"
+#endif
+
+#include <FastLED.h>
 
 #include "LoraManager.h"
 #include "FilesystemUtils.h"
@@ -68,6 +81,11 @@ public:
 
     static uint8_t MessageReceivedInputID;
     static ArduinoLoRaDriver ArduinoLora;
+
+    static void Bootstrap()
+    {
+        BootstrapLeds::Initialize();
+    }
 
     static void PassMessageReceivedToDisplay(uint32_t sendingUserID, bool isNew)
     {
@@ -252,7 +270,7 @@ public:
             }
 
             LED_Utils::setThemeColor(color);
-            auto interfaceColor = LED_Pattern_Interface::ThemeColor();
+            auto interfaceColor = LedPatternInterface::ThemeColor();
             ESP_LOGI(TAG_COMPASS, "LED Interface::ThemeColor: %d, %d, %d", interfaceColor.r, interfaceColor.g, interfaceColor.b);
 
             // Lora Module

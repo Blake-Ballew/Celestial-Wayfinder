@@ -20,11 +20,11 @@
 
 #include "TinyGPS++.h"
 
-#include "ScrollWheel.h"
-#include "SolidRing.h"
-#include "RingPoint.h"
-#include "Illuminate_Button.h"
-#include "Ring_Pulse.h"
+#include "ScrollWheel.hpp"
+#include "SolidRing.hpp"
+#include "RingPoint.hpp"
+#include "IlluminateButton.hpp"
+#include "RingPulse.hpp"
 
 #include "MessagePing.h"
 
@@ -179,46 +179,9 @@ void setup()
 
   System_Utils::init();
 
-  // Initialize inputID to LED index mapping
-  std::unordered_map<uint8_t, uint8_t> inputIdLedIdx = {
-    {DisplayModule::InputID::BUTTON_1, 22},
-    {DisplayModule::InputID::BUTTON_2, 19},
-    {DisplayModule::InputID::BUTTON_3, 18},
-    {DisplayModule::InputID::BUTTON_4, 17},
-    {DisplayModule::InputID::ENC_UP, 20},
-    {DisplayModule::InputID::ENC_DOWN, 21},
-    {BUTTON_SOS, 16},
-  };
 
-  ESP_LOGI(TAG, "Initializing LED pins");
-  LED_Manager::InitializeInputIdLedPins(inputIdLedIdx);
-  LED_Manager::initializeButtonFlashAnimation();
-  DisplayModule::Utilities::getInputRaised() += [](const DisplayModule::InputContext &ctx) {
-    ESP_LOGI(TAG, "Passing input to LED manager: %d", ctx.inputID);
-    LED_Manager::inputButtonFlash(ctx);
-  };
-
-  // Initialize other animations
-  ScrollWheel *scrollWheel = new ScrollWheel();
-  SolidRing *solidRing = new SolidRing();
-  RingPoint *ringPoint = new RingPoint();
-  Illuminate_Button *IlluminateButton = new Illuminate_Button(inputIdLedIdx);
-  Ring_Pulse *ringPulse = new Ring_Pulse();
-
-  LED_Utils::registerPattern(scrollWheel);
-  LED_Utils::registerPattern(solidRing);
-  LED_Utils::registerPattern(ringPoint);
-  LED_Utils::registerPattern(IlluminateButton);
-  LED_Utils::registerPattern(ringPulse);
-
-  StaticJsonDocument<128> cfg;
-  cfg["beginIdx"] = 0;
-  cfg["endIdx"] = 15;
-
-  scrollWheel->configurePattern(cfg);
-  solidRing->configurePattern(cfg);
-  ringPoint->configurePattern(cfg);
-  ringPulse->configurePattern(cfg);
+  // Initialize modules
+  CompassUtils::Bootstrap();
 
   displayCommandQueue = DisplayModule::Utilities::getDisplayCommandQueue();
 

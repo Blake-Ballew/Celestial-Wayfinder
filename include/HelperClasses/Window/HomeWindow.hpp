@@ -15,6 +15,7 @@
 #include "LoraUtils.h"
 #include "NavigationUtils.h"
 #include <functional>
+#include "../Led/Patterns/Flashlight.hpp"
 
 namespace DisplayModule
 {
@@ -521,7 +522,11 @@ namespace DisplayModule
             #if HARDWARE_VERSION == 1 || HARDWARE_VERSION == 2
             menuItems.push_back(DisplayModule::MenuItem("Flashlight", []()
             {
-                LED_Manager::toggleFlashlight();
+                auto flashlightId = Flashlight::RegisteredPatternID();
+                StaticJsonDocument<64> doc;
+                doc["toggle"] = true;
+                LED_Utils::configurePattern(flashlightId, doc);
+                LED_Utils::iteratePattern(flashlightId);
             }));
             #endif
 

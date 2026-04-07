@@ -1,0 +1,164 @@
+#pragma once
+
+#include "globalDefines.h"
+
+#include "FastLED.h"
+
+#include "LedPatternInterface.hpp"
+#include "LedSegment.hpp"
+#include "LED_Manager.h"
+#include "DisplayUtilities.hpp"
+
+// Patterns
+
+#include "ButtonFlash.hpp"
+#include "IlluminateButton.hpp"
+#include "RingPoint.hpp"
+#include "RingPulse.hpp"
+#include "ScrollWheel.hpp"
+#include "SolidRing.hpp"
+#include "../../HelperClasses/Led/Patterns/Flashlight.hpp"
+
+#define NUM_COMPASS_LEDS 16
+#define NUM_FLASHLIGHT_LEDS 8
+#define NUM_LEDS 30
+#define LED_PIN 27
+#define LED_ORDER GRB
+#define LED_TYPE WS2812B
+#define LED_TASK_CPU_CORE 0
+
+/*
+LED Mappings:
+0:      Power Button
+1:      Button 3
+2:      Button 4
+3:      Button 2
+4:      Button 1
+5-12:   Screen Light
+13-16:  Left Trace
+17-48:  Compass (Counter-clockwise)
+49-56:  Knob ring (Counter-clockwise)
+57-60:  Right Trace
+*/
+
+class BootstrapLeds
+{
+public:
+    static void Initialize()
+    {
+        FastLED.addLeds<LED_TYPE, LED_PIN, LED_ORDER>(LEDBuffer(), NUM_LEDS);
+
+        LED_Utils::registerPattern(&ButtonFlashPattern());
+        LED_Utils::registerPattern(&IlluminateButtonPattern());
+        LED_Utils::registerPattern(&RingPointPattern());
+        LED_Utils::registerPattern(&RingPulsePattern());
+        LED_Utils::registerPattern(&ScrollWheelPattern());
+        LED_Utils::registerPattern(&FlashlightPattern());
+
+        LED_Manager::init(NUM_LEDS, LEDBuffer(), LED_TASK_CPU_CORE);
+
+        // Initialize button flashing animation
+
+        auto buttonFlashPatternID = ButtonFlash::RegisteredPatternID();
+        LED_Utils::enablePattern(buttonFlashPatternID);
+        LED_Utils::setAnimationLengthMS(buttonFlashPatternID, 300);
+
+        DisplayModule::Utilities::getInputRaised() += [](const DisplayModule::InputContext &ctx) {
+            ESP_LOGI(TAG, "Button flash input: %d", ctx.inputID);
+            StaticJsonDocument<64> cfg;
+            cfg["inputID"] = ctx.inputID;
+            auto buttonFlashPatternID = ButtonFlash::RegisteredPatternID();
+            LED_Utils::configurePattern(buttonFlashPatternID, cfg);
+            LED_Utils::loopPattern(buttonFlashPatternID, 1);
+        };
+    }
+
+    static CRGB *LEDBuffer() 
+    {
+        static CRGB leds[NUM_LEDS];
+        return leds;
+    }
+
+#pragma region LED_Segments
+
+    static LedSegment &CompassRingSegment()
+    {
+        static LedSegment compassRing(LEDBuffer(), 0, NUM_COMPASS_LEDS);
+        return compassRing;
+    }
+
+    static LedSegment &InputLedSegment()
+    {
+        // Initialize input LEDs in order of InputID
+        static LedSegment inputLeds(LEDBuffer(), {22, 19, 18, 17, 16, 20, 21});
+        return inputLeds;
+    }
+
+    static LedSegment &FlashlightSegment()
+    {
+        static LedSegment flashlight(LEDBuffer(), 23, NUM_FLASHLIGHT_LEDS);
+        return flashlight;
+    }
+
+#pragma endregion
+
+#pragma region LED_Patterns
+
+    static ButtonFlash &ButtonFlashPattern()
+    {
+        static ButtonFlash buttonFlash(
+            InputLedSegment(), 
+            {
+                DisplayModule::InputID::BUTTON_1,
+                DisplayModule::InputID::BUTTON_2,
+                DisplayModule::InputID::BUTTON_3,
+                DisplayModule::InputID::BUTTON_4,
+                BUTTON_SOS,
+                DisplayModule::InputID::ENC_UP,
+                DisplayModule::InputID::ENC_DOWN
+            });
+        return buttonFlash;
+    }
+
+    static IlluminateButton &IlluminateButtonPattern()
+    {
+        static IlluminateButton illuminateButton(
+            InputLedSegment(), 
+            {
+                DisplayModule::InputID::BUTTON_1,
+                DisplayModule::InputID::BUTTON_2,
+                DisplayModule::InputID::BUTTON_3,
+                DisplayModule::InputID::BUTTON_4,
+                BUTTON_SOS,
+                DisplayModule::InputID::ENC_UP,
+                DisplayModule::InputID::ENC_DOWN
+            });
+        return illuminateButton;
+    }
+
+    static RingPoint &RingPointPattern()
+    {
+        static RingPoint ringPoint(CompassRingSegment());
+        return ringPoint;
+    }
+
+    static RingPulse &RingPulsePattern()
+    {
+        static RingPulse ringPulse(CompassRingSegment());
+        return ringPulse;
+    }
+
+    static ScrollWheel &ScrollWheelPattern()
+    {
+        static ScrollWheel scrollWheel(CompassRingSegment());
+        return scrollWheel;
+    }
+
+    static Flashlight &FlashlightPattern()
+    {
+        static Flashlight flashlight(FlashlightSegment());
+        return flashlight;
+    }
+
+#pragma endregion
+};
