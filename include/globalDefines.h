@@ -11,7 +11,7 @@
 #endif
 
 #define MESSAGE_RECEIVED 7
-#define BUTTON_SOS 8
+#define BUTTON_SOS 16
 
 #if HARDWARE_VERSION == 1
 #define BUTTON_1_PIN 36
@@ -73,8 +73,7 @@
 #define USERID_SIZE_BYTES 8
 
 #if HARDWARE_VERSION == 1
-#define NUM_LEDS 30
-#define LED_PIN 27
+
 #endif
 
 #if HARDWARE_VERSION == 2

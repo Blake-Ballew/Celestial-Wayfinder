@@ -1,10 +1,20 @@
 #pragma once
 
-#include <FastLED.h>
+#if HARDWARE_VERSION == 1
+    #include "Bootstrap/V1/BootstrapLeds.hpp"
+#elif HARDWARE_VERSION == 2
+    #include "Bootstrap/V2/BootstrapLeds.hpp"
+#elif HARDWARE_VERSION == 3
+    #include "Bootstrap/V3/BootstrapLeds.hpp"
+#else
+    #error "Unknown HARDWARE_VERSION. Must be 1, 2, or 3."
+#endif
 
 #ifdef USE_V3_OLED
 #include "Adafruit_SSD1327.h"
 #endif
+
+#include <FastLED.h>
 
 #include "LoraManager.h"
 #include "FilesystemUtils.h"
@@ -42,8 +52,6 @@ static const char *TAG_COMPASS = "COMPASS";
 
 namespace
 {
-    const char *SETTINGS_FILENAME PROGMEM = "/Settings.msgpk";
-    const char *OLD_SETTINGS_FILENAME PROGMEM = "/settings.json";
     static RpcModule::Manager RpcManagerInstance;
     static DisplayModule::Manager DisplayManagerInstance;
     static ConnectivityModule::EspNowManager EspNowManagerInstance;
@@ -71,6 +79,11 @@ public:
 
     static uint8_t MessageReceivedInputID;
     static ArduinoLoRaDriver ArduinoLora;
+
+    static void Bootstrap()
+    {
+        BootstrapLeds::Initialize();
+    }
 
     static void PassMessageReceivedToDisplay(uint32_t sendingUserID, bool isNew)
     {
@@ -223,8 +236,11 @@ public:
 
         if (!doc.isNull())
         {
+            std::string debugStr = doc.as<std::string>();
+            ESP_LOGI(TAG_COMPASS, "Settings JSON: %s", debugStr.c_str());
+
             // LED Module
-            int colorTheme = doc["Color Theme"].as<int>();
+            int colorTheme = doc["Theme Color"].as<int>();
 
             uint8_t red = doc["Theme Color Red"].as<uint8_t>();
             uint8_t green = doc["Theme Color Green"].as<uint8_t>();
@@ -255,14 +271,13 @@ public:
             }
 
             LED_Utils::setThemeColor(color);
-            auto interfaceColor = LED_Pattern_Interface::ThemeColor();
+            auto interfaceColor = LedPatternInterface::ThemeColor();
             ESP_LOGI(TAG_COMPASS, "LED Interface::ThemeColor: %d, %d, %d", interfaceColor.r, interfaceColor.g, interfaceColor.b);
 
             // Lora Module
             LoraUtils::SetUserName(doc["User Name"].as<std::string>());
             LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"].as<uint8_t>());
 
-            float frequency = doc["Frequency"].as<float>();
             // ArduinoLora.SetFrequency(frequency);
             ArduinoLora.SetSpreadingFactor(7);
             ArduinoLora.SetSignalBandwidth(125E3);
@@ -275,9 +290,11 @@ public:
             ArduinoLora.SetTXPower(23);
             #endif
 
-            #if DEBUG == 1
-            ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
+            #if HARDWARE_VERSION == 3
+            ArduinoLora.SetTXPower(23);
             #endif
+
+            ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
         }
     }
 
