@@ -118,9 +118,9 @@ void setup()
 
   // enterUselessLoop();
 
-  // Initialize LED Module
-  CompassUtils::InitializeLedManager(CPU_CORE_APP);
-
+  // Boostrap hardware modules and utilities
+  CompassUtils::Bootstrap();
+  
   vTaskDelay(300);
 
   #if HARDWARE_VERSION == 3

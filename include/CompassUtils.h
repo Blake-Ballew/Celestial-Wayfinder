@@ -52,8 +52,6 @@ static const char *TAG_COMPASS = "COMPASS";
 
 namespace
 {
-    const char *SETTINGS_FILENAME PROGMEM = "/Settings.msgpk";
-    const char *OLD_SETTINGS_FILENAME PROGMEM = "/settings.json";
     static RpcModule::Manager RpcManagerInstance;
     static DisplayModule::Manager DisplayManagerInstance;
     static ConnectivityModule::EspNowManager EspNowManagerInstance;
@@ -238,8 +236,11 @@ public:
 
         if (!doc.isNull())
         {
+            std::string debugStr = doc.as<std::string>();
+            ESP_LOGI(TAG_COMPASS, "Settings JSON: %s", debugStr.c_str());
+
             // LED Module
-            int colorTheme = doc["Color Theme"].as<int>();
+            int colorTheme = doc["Theme Color"].as<int>();
 
             uint8_t red = doc["Theme Color Red"].as<uint8_t>();
             uint8_t green = doc["Theme Color Green"].as<uint8_t>();
@@ -277,7 +278,6 @@ public:
             LoraUtils::SetUserName(doc["User Name"].as<std::string>());
             LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"].as<uint8_t>());
 
-            float frequency = doc["Frequency"].as<float>();
             // ArduinoLora.SetFrequency(frequency);
             ArduinoLora.SetSpreadingFactor(7);
             ArduinoLora.SetSignalBandwidth(125E3);
@@ -290,9 +290,11 @@ public:
             ArduinoLora.SetTXPower(23);
             #endif
 
-            #if DEBUG == 1
-            ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
+            #if HARDWARE_VERSION == 3
+            ArduinoLora.SetTXPower(23);
             #endif
+
+            ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
         }
     }
 

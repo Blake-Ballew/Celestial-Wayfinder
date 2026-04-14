@@ -22,6 +22,7 @@
 
 
 #define NUM_LEDS 61
+#define LED_EN_PIN 15
 #define LED_PIN 16
 #define LED_ORDER GRB
 #define LED_TYPE WS2812B
@@ -75,7 +76,10 @@ class BootstrapLeds
 public:
     static void Initialize()
     {
+        ESP_LOGI(TAG, "Initializing LEDs");
         FastLED.addLeds<LED_TYPE, LED_PIN, LED_ORDER>(LEDBuffer(), NUM_LEDS);
+        pinMode(LED_EN_PIN, OUTPUT);
+        digitalWrite(LED_EN_PIN, HIGH);
 
         LED_Utils::registerPattern(&ButtonFlashPattern());
         LED_Utils::registerPattern(&IlluminateButtonPattern());
