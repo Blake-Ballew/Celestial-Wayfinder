@@ -15,11 +15,6 @@
 
 #include "CompassUtils.h"
 
-#include "HelperClasses/Compass/QMC5883L.h"
-#include "HelperClasses/Compass/LSM303AGR.h"
-
-#include "TinyGPS++.h"
-
 #include "ScrollWheel.hpp"
 #include "SolidRing.hpp"
 #include "RingPoint.hpp"
@@ -67,10 +62,6 @@ ESP32Encoder encoder(true, enc_cb);
 ArduinoLoRaDriver CompassUtils::ArduinoLora(&loraSpi, LORA_CS, LORA_RST, LORA_DIO0, 915E6);
 LoraManager loraManager(&CompassUtils::ArduinoLora);
 
-// Navigation Objects
-CompassInterface *compass;
-NavigationManager navigationManager;
-
 // Filesytstem Manager. May not even need this
 
 void enableInterruptsHandler();
@@ -81,8 +72,6 @@ void setup()
 {
   Serial.begin(115200);
   vTaskDelay(1000);
-  ESP_LOGI(TAG, "Initializing Hardware Version %d", HARDWARE_VERSION);
-
 
   bootloader_random_enable();
 
@@ -114,10 +103,6 @@ void setup()
   encoder.setFilter(1023);
   encoder.setCount(0);
   
-  CompassUtils::InitializeSettings();
-
-  // enterUselessLoop();
-
   // Boostrap hardware modules and utilities
   CompassUtils::Bootstrap();
   
@@ -135,53 +120,20 @@ void setup()
   }
   #endif
 
-  // Intialize Navigation Module
-  // Initialize Compass
-#if HARDWARE_VERSION == 1
-#if DEBUG == 1
-  ESP_LOGI(TAG, "Using QMC5883L");
-#endif
-  QMC5883L *QMC5883Lcompass = new QMC5883L();
-  QMC5883Lcompass->SetInvertX(true);
-
-  compass = QMC5883Lcompass;
-#endif
-#if HARDWARE_VERSION == 2
-#if DEBUG == 1
-  ESP_LOGI(TAG, "Using LSM303AGR");
-#endif
-  compass = new LSM303AGR();
-#endif
-
-  ESP_LOGI(TAG, "Initializing Navigation Manager");
-
-  // Initialize GPS Stream
-  #if HARDWARE_VERSION == 3
-  Serial2.setPins(5, 4);
-  #endif
-  Serial2.begin(9600);
-  navigationManager.InitializeUtils(compass, Serial2);
-
   // Initialize Lora Module
   #if HARDWARE_VERSION == 3
   loraSpi.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
   #endif
   auto success = loraManager.Init();
 
-#if DEBUG == 1
   if (!success)
   {
     ESP_LOGE(TAG, "Failed to initialize Lora module");
   }
-#endif
 
   CompassUtils::InitializeDisplayManager();
 
   System_Utils::init();
-
-
-  // Initialize modules
-  CompassUtils::Bootstrap();
 
   displayCommandQueue = DisplayModule::Utilities::getDisplayCommandQueue();
 
@@ -264,7 +216,7 @@ void disableInterruptsHandler()
   detachInterrupt(BUTTON_1_PIN);
   detachInterrupt(BUTTON_2_PIN);
   detachInterrupt(BUTTON_3_PIN);
-  detachInterrupt(BUTTON_4_PIN);
+  detachInterrupt(BUTTON_4_PIN); 
   inputEncoder->pauseCount();
 }
 

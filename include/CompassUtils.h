@@ -2,10 +2,13 @@
 
 #if HARDWARE_VERSION == 1
     #include "Bootstrap/V1/BootstrapLeds.hpp"
+    #include "Bootstrap/V1/BootstrapNavigation.hpp"
 #elif HARDWARE_VERSION == 2
     #include "Bootstrap/V2/BootstrapLeds.hpp"
+    #include "Bootstrap/V2/BootstrapNavigation.hpp"
 #elif HARDWARE_VERSION == 3
     #include "Bootstrap/V3/BootstrapLeds.hpp"
+    #include "Bootstrap/V3/BootstrapNavigation.hpp"
 #else
     #error "Unknown HARDWARE_VERSION. Must be 1, 2, or 3."
 #endif
@@ -82,7 +85,12 @@ public:
 
     static void Bootstrap()
     {
+        ESP_LOGI(TAG, "Initializing Hardware Version %d", HARDWARE_VERSION);
+
+        InitializeSettings();
+
         BootstrapLeds::Initialize();
+        BootstrapNavigation::Initialize();
     }
 
     static void PassMessageReceivedToDisplay(uint32_t sendingUserID, bool isNew)
