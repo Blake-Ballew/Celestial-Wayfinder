@@ -1,6 +1,8 @@
 #pragma once
 
-#include "HelperClasses/Compass/LSM303AGR.h"
+#include "BootstrapMicrocontroller.hpp"
+
+#include "HelperClasses/Compass/CompassV3.hpp"
 #include "TinyGPS++.h"
 
 #include "NavigationManager.h"
@@ -27,9 +29,9 @@ public:
 
     // =================== Hardware =======================
 
-    static LSM303AGR &CompassInstance()
+    static CompassV3 &CompassInstance()
     {
-        static LSM303AGR compass;
+        static CompassV3 compass(BootstrapMicrocontroller::ScannedDevices(), BootstrapMicrocontroller::I2cBus());
         return compass;
     }
 };

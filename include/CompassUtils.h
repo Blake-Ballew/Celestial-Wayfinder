@@ -1,18 +1,5 @@
 #pragma once
 
-#if HARDWARE_VERSION == 1
-    #include "Bootstrap/V1/BootstrapLeds.hpp"
-    #include "Bootstrap/V1/BootstrapNavigation.hpp"
-#elif HARDWARE_VERSION == 2
-    #include "Bootstrap/V2/BootstrapLeds.hpp"
-    #include "Bootstrap/V2/BootstrapNavigation.hpp"
-#elif HARDWARE_VERSION == 3
-    #include "Bootstrap/V3/BootstrapLeds.hpp"
-    #include "Bootstrap/V3/BootstrapNavigation.hpp"
-#else
-    #error "Unknown HARDWARE_VERSION. Must be 1, 2, or 3."
-#endif
-
 #ifdef USE_V3_OLED
 #include "Adafruit_SSD1327.h"
 #endif
@@ -43,7 +30,7 @@
 // Window Includes
 
 #include "HelperClasses/Window/HomeWindow.hpp"
-#include "CompassWindow.hpp"
+#include "HelperClasses/Window/CompassWindow.hpp"
 #include "GpsWindow.hpp"
 #include "DiagnosticsWindow.hpp"
 #include "EditSavedLocationsWindow.hpp"
@@ -82,16 +69,6 @@ public:
 
     static uint8_t MessageReceivedInputID;
     static ArduinoLoRaDriver ArduinoLora;
-
-    static void Bootstrap()
-    {
-        ESP_LOGI(TAG, "Initializing Hardware Version %d", HARDWARE_VERSION);
-
-        InitializeSettings();
-
-        BootstrapLeds::Initialize();
-        BootstrapNavigation::Initialize();
-    }
 
     static void PassMessageReceivedToDisplay(uint32_t sendingUserID, bool isNew)
     {
@@ -439,14 +416,14 @@ public:
         }
     }
 
-    // Display Manager
+    // Display Module
 
     static void InitializeDisplayManager()
     {
         ESP_LOGI(TAG, "Initializing display driver...");
         auto displayPtr = InitializeDisplayDriver();
 
-        DisplayManagerInstance.init(displayPtr, OLED_WIDTH, OLED_HEIGHT); 
+        DisplayManagerInstance.Initialize(displayPtr, OLED_WIDTH, OLED_HEIGHT); 
 
         DisplayModule::initDefaultLayers();
 
@@ -775,22 +752,31 @@ public:
         DisplayModule::Utilities::pushWindow(settingsWindowPtr);
     }
 
-    static void InitializeLedManager(uint8_t cpuCore = 0)
+    // Microcontroller Utils
+
+    static std::unordered_set<uint8_t> ScanI2cAddresses(TwoWire &wire = Wire) 
     {
-        auto leds = new CRGB[NUM_LEDS];
+        constexpr uint8_t MIN_ADDRESS = 0x01;
+        constexpr uint8_t MAX_ADDRESS = 0x7F;
 
-        #if HARDWARE_VERSION == 1
-            FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
-        #elif HARDWARE_VERSION == 2
-            FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
-        #elif HARDWARE_VERSION == 3
-            FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
-        #endif
+        std::unordered_set<uint8_t> devicesScanned;
 
-        LED_Manager::init(NUM_LEDS, leds, cpuCore);
+        for (auto addr = MIN_ADDRESS; addr <= MAX_ADDRESS; addr++)
+        {
+            wire.beginTransmission(addr);
+            uint8_t rc = wire.endTransmission();
+
+            if (rc == 0)
+            {
+                ESP_LOGI("TAG", "Found I2C device at address: %2X", addr);
+                devicesScanned.insert(addr);
+            }
+        }
+
+        return devicesScanned;
     }
 
-    private:
+private:
 
     const char * _TAG = "CompassUtils";
 

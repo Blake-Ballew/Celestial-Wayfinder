@@ -25,6 +25,23 @@
 
 #include <unordered_map>
 
+#if HARDWARE_VERSION == 1
+    #include "Bootstrap/V1/BootstrapMicrocontroller.hpp"
+    #include "Bootstrap/V1/BootstrapLeds.hpp"
+    #include "Bootstrap/V1/BootstrapNavigation.hpp"
+#elif HARDWARE_VERSION == 2
+    #include "Bootstrap/V2/BootstrapMicrocontroller.hpp"
+    #include "Bootstrap/V2/BootstrapLeds.hpp"
+    #include "Bootstrap/V2/BootstrapNavigation.hpp"
+#elif HARDWARE_VERSION == 3
+    #include "Bootstrap/V3/BootstrapMicrocontroller.hpp"
+    #include "Bootstrap/V3/BootstrapLeds.hpp"
+    #include "Bootstrap/V3/BootstrapNavigation.hpp"
+    #include "Bootstrap/V3/BootstrapDisplay.hpp"
+#else
+    #error "Unknown HARDWARE_VERSION. Must be 1, 2, or 3."
+#endif
+
 extern "C"
 {
 #include "bootloader_random.h"
@@ -57,16 +74,13 @@ SPIClass loraSpi(HSPI);
 SPIClass loraSpi;
 #endif
 
-ESP32Encoder encoder(true, enc_cb);
-
 ArduinoLoRaDriver CompassUtils::ArduinoLora(&loraSpi, LORA_CS, LORA_RST, LORA_DIO0, 915E6);
 LoraManager loraManager(&CompassUtils::ArduinoLora);
-
-// Filesytstem Manager. May not even need this
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
 void enterUselessLoop();
+void Bootstrap();
 
 void setup()
 {
@@ -74,51 +88,11 @@ void setup()
   vTaskDelay(1000);
 
   bootloader_random_enable();
-
-  pinMode(ENC_A, INPUT_PULLUP);
-  pinMode(ENC_B, INPUT_PULLUP);
-  pinMode(BUTTON_SOS_PIN, INPUT_PULLUP);
-  pinMode(BUTTON_1_PIN, INPUT_PULLUP);
-  pinMode(BUTTON_2_PIN, INPUT_PULLUP);
-  pinMode(BUTTON_3_PIN, INPUT_PULLUP);
-#if HARDWARE_VERSION == 1 || HARDWARE_VERSION == 2
-  pinMode(BUTTON_4_PIN, INPUT);
-#else
-  pinMode(BUTTON_4_PIN, INPUT_PULLUP);
-#endif
-  pinMode(BUZZER_PIN, OUTPUT);
-
-#if HARDWARE_VERSION < 3
-  auto BATT_SENSE_PIN = 39;
-  pinMode(BATT_SENSE_PIN, INPUT);
-#endif
-
-#if HARDWARE_VERSION == 1
-  auto KEEP_ALIVE_PIN = 5;
-  pinMode(KEEP_ALIVE_PIN, OUTPUT);  
-  digitalWrite(KEEP_ALIVE_PIN, HIGH);
-#endif
-
-  encoder.attachFullQuad(ENC_A, ENC_B);
-  encoder.setFilter(1023);
-  encoder.setCount(0);
   
   // Boostrap hardware modules and utilities
-  CompassUtils::Bootstrap();
+  Bootstrap();
   
   vTaskDelay(300);
-
-  #if HARDWARE_VERSION == 3
-  auto wireSuccess = Wire.begin(18, 17);
-  if (wireSuccess)
-  {
-    ESP_LOGI(TAG, "Successfully initialized display I2C");
-  }
-  else
-  {
-    ESP_LOGW(TAG, "Failed to init display I2C");
-  }
-  #endif
 
   // Initialize Lora Module
   #if HARDWARE_VERSION == 3
@@ -130,8 +104,6 @@ void setup()
   {
     ESP_LOGE(TAG, "Failed to initialize Lora module");
   }
-
-  CompassUtils::InitializeDisplayManager();
 
   System_Utils::init();
 
@@ -160,31 +132,6 @@ void setup()
   CompassUtils::InitializeRpc(1, CPU_CORE_LORA);
 
   CompassUtils::WireFunctions();
-
-  // Register edits for Lora
-  
-  // CompassUtils::driver.spiWrite(0x1F, 0xFF); //increase RX timeout
-
-  #if HARDWARE_VERSION == 2
-  // CompassUtils::driver.spiWrite(0x0B, 0x0B);
-  // CompassUtils::driver.spiWrite(0x0C, 0x20);
-  // CompassUtils::driver.spiWrite(0x22, 0x52);
-  // CompassUtils::driver.spiWrite(0x0D, 0x52);
-  // CompassUtils::driver.spiWrite(0x1F, 0x64);
-  #endif
-
-#if DEBUG == 1
-  for (int i = 0; i <= 0x39; i++)
-  {
-    // ESP_LOGD(TAG, "0x%02X: 0x%02X", i, CompassUtils::driver.spiRead(i));
-  }
-#endif
-
-#if DEBUG == 1
-  // FilesystemUtils::PrintSettingsFile();
-#endif
-
-  inputEncoder = &encoder;
 
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 
@@ -229,5 +176,17 @@ void enterUselessLoop()
     ESP_LOGI("SETUP", "Infinite loop: %d\n", counter);
     vTaskDelay(3000);
   }
+}
+
+void Bootstrap()
+{
+  ESP_LOGI(TAG, "Initializing Hardware Version %d", HARDWARE_VERSION);
+
+  CompassUtils::InitializeSettings();
+
+  BootstrapMicrocontroller::Initialize();
+  BootstrapLeds::Initialize();
+  BootstrapNavigation::Initialize();
+  BootstrapDisplay::Inititalize();
 }
 

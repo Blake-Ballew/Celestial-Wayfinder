@@ -6,6 +6,7 @@
 #include <Adafruit_LIS2MDL.h>
 #include <Adafruit_LSM303_Accel.h>
 #include "esp_log.h"
+#include "ArduinoJson.hpp"
 
 static const char *TAG_COMPASS_LSM = "COMPASS";
 
@@ -29,29 +30,21 @@ public:
     {
         if (!Wire.available())
         {
-            #if DEBUG == 1
             ESP_LOGI(TAG_COMPASS_LSM, "LSM303AGR: Initializing Wire");
-            #endif
         }
         else
         {
-            #if DEBUG == 1
             ESP_LOGI(TAG_COMPASS_LSM, "LSM303AGR: Wire already initialized");
-            #endif
         }
 
-        #if DEBUG == 1
         ESP_LOGI(TAG_COMPASS_LSM, "LSM303AGR: Initializing");
-        #endif
 
         if (!_CompassMagnetometer.begin(0x1E, &Wire))
         {
             ESP_LOGE(TAG_COMPASS_LSM, "LSM303AGR: Magnetometer not found");
         }
 
-        #if DEBUG == 1
         ESP_LOGI(TAG_COMPASS_LSM, "CompassMagnetometer Initialized");
-        #endif
 
         if (!_CompassAccelerometer.begin())
         {

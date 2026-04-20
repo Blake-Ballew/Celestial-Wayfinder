@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HelperClasses/Compass/LSM303AGR.h"
+#include "HelperClasses/Compass/CompassV2.hpp"
 #include "TinyGPS++.h"
 
 #include "NavigationManager.h"
