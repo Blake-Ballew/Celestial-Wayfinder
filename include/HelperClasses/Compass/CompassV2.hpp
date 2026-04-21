@@ -92,9 +92,7 @@ public:
         accel.y = Ay;
         accel.z = Az;
 
-        float azimuth = GetHeading(mag, accel);
-
-        return 360.0f - azimuth;
+        return GetHeading(mag, accel);
     }
 
     void PrintRawValues()
@@ -237,7 +235,7 @@ protected:
             heading += 360.0;
         }
 
-        return heading;
+        return heading;                                                  
     }
 
     void VectorCross(const Vector &a, const Vector &b, Vector &result)

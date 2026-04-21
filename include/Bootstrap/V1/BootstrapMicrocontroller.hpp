@@ -39,6 +39,17 @@ public:
         
         inputEncoder = &Encoder();
 
+        ESP_LOGI("BootstrapMicro", "Initializing I2C bus...");
+        auto wireSuccess = I2cBus().begin(SDA_PIN, SCL_PIN);
+        if (wireSuccess)
+        {
+            ESP_LOGI(TAG, "Successfully initialized I2C");
+        }
+        else
+        {
+            ESP_LOGW(TAG, "Failed to init I2C");
+        }
+
         ScannedDevices() = CompassUtils::ScanI2cAddresses(I2cBus());
     }
 

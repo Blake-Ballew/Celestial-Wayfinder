@@ -145,6 +145,7 @@ public:
     static Adafruit_SSD1306 &OledDisplay()
     {
         static Adafruit_SSD1306 oledDisplay(OLED_WIDTH, OLED_HEIGHT, &BootstrapMicrocontroller::I2cBus(), -1);
+        return oledDisplay;
     }
 
     // DisplayModule

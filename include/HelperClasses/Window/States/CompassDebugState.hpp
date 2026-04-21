@@ -72,7 +72,7 @@ namespace DisplayModule
 
         // Returns the most recently read azimuth (degrees, 0–360).
         // TODO: Figure out if this is needed
-        float currentAzimuth() const { return _heading; }
+        // float currentAzimuth() const { return _heading; }
 
     private:
         float _heading = 0.0f;

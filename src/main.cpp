@@ -29,10 +29,12 @@
     #include "Bootstrap/V1/BootstrapMicrocontroller.hpp"
     #include "Bootstrap/V1/BootstrapLeds.hpp"
     #include "Bootstrap/V1/BootstrapNavigation.hpp"
+    #include "Bootstrap/V1/BootstrapDisplay.hpp"
 #elif HARDWARE_VERSION == 2
     #include "Bootstrap/V2/BootstrapMicrocontroller.hpp"
     #include "Bootstrap/V2/BootstrapLeds.hpp"
     #include "Bootstrap/V2/BootstrapNavigation.hpp"
+    #include "Bootstrap/V2/BootstrapDisplay.hpp"
 #elif HARDWARE_VERSION == 3
     #include "Bootstrap/V3/BootstrapMicrocontroller.hpp"
     #include "Bootstrap/V3/BootstrapLeds.hpp"

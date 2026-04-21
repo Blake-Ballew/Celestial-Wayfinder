@@ -10,6 +10,9 @@
 #define BUZZER_PIN 4
 #define BATT_SENSE_PIN 39
 
+#define SDA_PIN 21
+#define SCL_PIN 22
+
 class BootstrapMicrocontroller
 {
 public:
@@ -34,6 +37,17 @@ public:
         Encoder().setCount(0);
         
         inputEncoder = &Encoder();
+
+        ESP_LOGI("BootstrapMicro", "Initializing I2C bus...");
+        auto wireSuccess = I2cBus().begin(SDA_PIN, SCL_PIN);
+        if (wireSuccess)
+        {
+            ESP_LOGI(TAG, "Successfully initialized I2C");
+        }
+        else
+        {
+            ESP_LOGW(TAG, "Failed to init I2C");
+        }
 
         ScannedDevices() = CompassUtils::ScanI2cAddresses(I2cBus());
     }
