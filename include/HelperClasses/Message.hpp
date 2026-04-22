@@ -1,4 +1,4 @@
-#pragma once
+    #pragma once
 
 #include "globalDefines.h"
 #include <ArduinoJson.h>
