@@ -235,7 +235,9 @@ protected:
             heading += 360.0;
         }
 
-        return heading;                                                  
+        // Something about these calculations isn't correct.
+        // Seems to work fine if we just mirror whatever calculation comes out
+        return 360.0f - heading;                                                  
     }
 
     void VectorCross(const Vector &a, const Vector &b, Vector &result)

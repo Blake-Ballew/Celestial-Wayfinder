@@ -65,17 +65,19 @@ namespace DisplayModule
         void onTick()
         {
             NavigationUtils::PrintRawValues(); // logs to serial/ESP_LOG
-            _heading = NavigationUtils::GetBearing();
+            auto heading = NavigationUtils::GetAzimuth();
+            _bearing = 360.0f - heading;
+            ESP_LOGD(TAG, "Current heading: %d Current bearing: %d", heading, static_cast<int>(_bearing));
             _rebuildDrawCommands();
             _configureLeds();
         }
 
         // Returns the most recently read azimuth (degrees, 0–360).
         // TODO: Figure out if this is needed
-        // float currentAzimuth() const { return _heading; }
+        // float currentAzimuth() const { return _bearing; }
 
     private:
-        float _heading = 0.0f;
+        float _bearing = 0.0f;
         int _ringPointPatternId = -1;
 
         void _rebuildDrawCommands()
@@ -83,7 +85,7 @@ namespace DisplayModule
             clearDrawCommands();
 
             char buf[24];
-            snprintf(buf, sizeof(buf), "Azimuth: %.1f", static_cast<double>(_heading));
+            snprintf(buf, sizeof(buf), "North: %.1f", static_cast<double>(_bearing));
 
             addDrawCommand(std::make_shared<TextDrawCommand>(
                 std::string(buf),
@@ -96,7 +98,7 @@ namespace DisplayModule
             StaticJsonDocument<64> doc;
 
             doc["fadeDegrees"] = 20;
-            doc["directionDegrees"] = _heading;
+            doc["directionDegrees"] = _bearing;
 
             LED_Utils::configurePattern(_ringPointPatternId, doc);
             LED_Utils::iteratePattern(_ringPointPatternId);
