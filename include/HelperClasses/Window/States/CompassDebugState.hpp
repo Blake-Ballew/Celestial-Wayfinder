@@ -37,7 +37,7 @@ namespace DisplayModule
     class CompassDebugState : public WindowState
     {
     public:
-        static constexpr uint32_t REFRESH_RATE_MS = 100;
+        static constexpr uint32_t REFRESH_RATE_MS = 50;
 
         CompassDebugState()
         {

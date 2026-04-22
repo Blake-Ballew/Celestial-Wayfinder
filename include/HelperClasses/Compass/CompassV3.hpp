@@ -17,8 +17,6 @@ static const char *TAG_COMPASS_V3 = "COMPASS_V3";
 
 namespace
 {
-    static const float   V3_AZIMUTH_OFFSET = -90.0f;
-
     // IMU Addresses
     static constexpr uint8_t BMI323_ADDR    = 0x69;
     static constexpr uint8_t LSM6DS_ADDR    = 0x6A;
@@ -66,7 +64,7 @@ public:
             ESP_LOGI(TAG_COMPASS_V3, "Initializing BMM350...");
             _magType = MagnetometerV3Type::BMM350;
             _magBmm350 = new DFRobot_BMM350_I2C(&i2cBus, BMM350_ADDR);
-            if (!_magBmm350->begin())
+            if (_magBmm350->begin())
             {
                 ESP_LOGE(TAG_COMPASS_V3, "ERROR: BMM350 could not be initialized!");
                 _magType = MagnetometerV3Type::NONE;
@@ -84,7 +82,8 @@ public:
         }
 
         // Init IMU
-        if (scannedDevices.count(BMI323_ADDR))
+        // if (scannedDevices.count(BMI323_ADDR))
+        if (false)
         {
             ESP_LOGI(TAG_COMPASS_V3, "Initializing BMI323...");
             _imuType = ImuV3Type::BMI323;
@@ -98,7 +97,7 @@ public:
         {
             ESP_LOGI(TAG_COMPASS_V3, "Initializing LSM6DS...");
             _imuType = ImuV3Type::LSM6DS;
-            if (!_imuLSM6DS.begin_I2C(LSM6DS_ADDR, &i2cBus))
+            if (!_imuLSM6DS.begin_I2C(LSM6DS_ADDR, &i2cBus, 12342))
             {
                 ESP_LOGE(TAG_COMPASS_V3, "ERROR: LSM6DS failed to initialize!");
                 _imuType = ImuV3Type::NONE;
@@ -129,7 +128,7 @@ public:
             return _AzimuthNoCompensation(mag);
         }
 
-        return _AzimuthCompensated(mag, accel);
+        return _HeadingCompensated(mag, accel);
     }
 
     void PrintRawValues() override
@@ -140,8 +139,8 @@ public:
         _GetMagReading(mag);
         _GetAccelReading(accel);
 
-        ESP_LOGI(TAG_COMPASS_V3, "Mag reading: x: %f, y: %f, z: %f", mag.x, mag.y, mag.z);
-        ESP_LOGI(TAG_COMPASS_V3, "Accel reading: x: %f, y: %f, z: %f", accel.x, accel.y, accel.z);
+        ESP_LOGD(TAG_COMPASS_V3, "Mag reading: x: %f, y: %f, z: %f", mag.x, mag.y, mag.z);
+        ESP_LOGD(TAG_COMPASS_V3, "Accel reading: x: %f, y: %f, z: %f", accel.x, accel.y, accel.z);
     }
 
     // ================== Calibration =====================
@@ -337,11 +336,6 @@ private:
         return (int)(360.0f - heading) % 360;
     }
 
-    int _AzimuthCompensated(Vector &mag, Vector &accel)
-    {
-        return 360.0f - _HeadingCompensated(mag, accel);
-    }
-
     float _HeadingCompensated(Vector &mag, Vector &accel)
     {
         Vector from = {1, 0, 0};
@@ -359,6 +353,11 @@ private:
         if (heading < 0)
         {
             heading += 360.0;
+        }
+
+        if (_magType == MagnetometerV3Type::BMM350)
+        {
+            heading = 360.0f - heading;
         }
 
         return heading;
@@ -392,7 +391,7 @@ private:
         }
         else if (_magType == MagnetometerV3Type::MMC5603)
         {
-            return 0.0f;
+            return 180.0f;
         }
         else
         {
