@@ -7,6 +7,9 @@
 #include "CompassUtils.h"
 #include "globalDefines.h"
 
+#define SDA_PIN 21
+#define SCL_PIN 22
+
 #define BUZZER_PIN 4
 #define BATT_SENSE_PIN 39
 #define KEEP_ALIVE_PIN 5
