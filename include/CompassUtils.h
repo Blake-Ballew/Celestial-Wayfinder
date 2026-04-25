@@ -193,11 +193,7 @@ public:
         auto broadcastAttempts = std::make_shared<FilesystemModule::IntSetting>("Num Broadcasts", 3, 1, 5, 1);
         settings[broadcastAttempts->key] = broadcastAttempts;
 
-        auto silentMode = std::make_shared<FilesystemModule::BoolSetting>("Silent Mode", false);
-        settings[silentMode->key] = silentMode;
-
-        auto time24hr = std::make_shared<FilesystemModule::BoolSetting>("24H Time", false);
-        settings[time24hr->key] = time24hr;
+        System_Utils::GenerateDefaultSettings(settings);
 
         std::vector<std::string> wifiOptions = {"Off", "AP Mode", "Station Mode"};
         std::vector<int> wifiValues = {0, 1, 2};
