@@ -8,6 +8,7 @@
 #include "NavigationManager.h"
 #include "GpsTimeSource.hpp"
 #include "EzTimeSource.hpp"
+#include "GpsGeolocationSource.hpp"
 #include "NavigationUtils.h"
 
 class BootstrapNavigation
@@ -40,5 +41,11 @@ public:
     {
         static CompassV3 compass(BootstrapMicrocontroller::ScannedDevices(), BootstrapMicrocontroller::I2cBus());
         return compass;
+    }
+
+    static NavigationModule::GpsGeolocationSource &GpsLocator()
+    {
+        static NavigationModule::GpsGeolocationSource gpsLocator(NavigationModule::Utilities::GetGPS());
+        return gpsLocator;
     }
 };
