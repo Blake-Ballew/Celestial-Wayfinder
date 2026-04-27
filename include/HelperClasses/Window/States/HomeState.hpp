@@ -11,7 +11,6 @@
 #include "NavigationUtils.h"
 #include "LoraUtils.h"
 #include "System_Utils.h"
-#include "FilesystemUtils.h"
 #include <ArduinoJson.h>
 
 namespace DisplayModule
@@ -19,7 +18,7 @@ namespace DisplayModule
     // -------------------------------------------------------------------------
     // HomeState
     // -------------------------------------------------------------------------
-    // The primary home screen.  Refreshes every 60 s (GPS / time update).
+    // The primary home screen.  Refreshes every 60 s.
     //
     // Input layout (wired by owning Window):
     //   BUTTON_1 — "Actions"   → SelectKeyValueState quick-action menu
@@ -81,36 +80,22 @@ namespace DisplayModule
 
             NavigationUtils::UpdateGPS();
 
-            // ── Time / GPS (right-aligned, line 2) ──────────────────────────
+            // ── Time (right-aligned, line 2) ────────────────────────────────
             {
-                char   buf[12];
-                TinyGPSTime t = NavigationUtils::GetTime();
+                std::string timeStr;
+                time_t localNow = 0;
 
-                if (t.isValid())
+                if (System_Utils::GetCurrentUTC(localNow))
                 {
-                    int hour = t.hour();
-                    hour = (hour < 4) ? hour + 20 : hour - 4; // UTC-4 adjust
-
-                    if (FilesystemModule::Utilities::FetchBoolSetting("24H Time", false))
-                    {
-                        snprintf(buf, sizeof(buf), "%02d:%02d",
-                                 hour, t.minute());
-                    }
-                    else
-                    {
-                        int h12 = hour % 12;
-                        if (h12 == 0) h12 = 12;
-                        snprintf(buf, sizeof(buf), "%02d:%02d %s",
-                                 h12, t.minute(), hour < 12 ? "AM" : "PM");
-                    }
+                    timeStr = System_Utils::FormatTime(System_Utils::GetCurrentLocal());
                 }
                 else
                 {
-                    snprintf(buf, sizeof(buf), "No GPS");
+                    timeStr = "No Time";
                 }
 
                 addDrawCommand(std::make_shared<TextDrawCommand>(
-                    std::string(buf),
+                    timeStr,
                     TextFormat{ TextAlignH::RIGHT, TextAlignV::LINE, 2 }
                 ));
             }

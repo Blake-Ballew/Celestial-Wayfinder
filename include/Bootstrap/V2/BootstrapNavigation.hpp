@@ -4,6 +4,8 @@
 #include "TinyGPS++.h"
 
 #include "NavigationManager.h"
+#include "GpsTimeSource.hpp"
+#include "EzTimeSource.hpp"
 #include "NavigationUtils.h"
 
 class BootstrapNavigation
@@ -17,6 +19,11 @@ public:
         Serial2.setPins(5, 4);
         Serial2.begin(9600);
         NavigationManagerInstance().InitializeUtils(&CompassInstance(), Serial2);
+
+        auto gpsTime = new GpsTimeSource(NavigationUtils::GetGPS());
+        auto ezTime = new EzTimeSource();
+        System_Utils::TimeSources().push_back(gpsTime);
+        System_Utils::TimeSources().push_back(ezTime);
     }
 
     static NavigationManager &NavigationManagerInstance()

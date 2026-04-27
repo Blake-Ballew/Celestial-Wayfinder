@@ -37,6 +37,8 @@ public:
 
             DisplayDriver() = std::shared_ptr<Adafruit_GFX>(&OledDisplay(), [](Adafruit_GFX*){});
 
+            DisplayModule::DrawCommand::DrawColorPrimary() = SSD1306_WHITE;
+
             DisplayModule::Utilities::onRenderComplete += []()
             {
                 OledDisplay().display();
@@ -47,6 +49,7 @@ public:
             ESP_LOGI(TAG, "Initializing Virtual display driver...");
 
             VirtualDisplay().setTextColor(WHITE);
+            DisplayModule::DrawCommand::DrawColorPrimary() = SSD1306_WHITE;
 
             DisplayDriver() = std::shared_ptr<Adafruit_GFX>(&VirtualDisplay(), [](Adafruit_GFX*){});
         }
