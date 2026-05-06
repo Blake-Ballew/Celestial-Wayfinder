@@ -4,9 +4,8 @@
 #include "TinyGPS++.h"
 
 #include "NavigationManager.h"
-#include "GpsTimeSource.hpp"
+#include "GpsSource.hpp"
 #include "EzTimeSource.hpp"
-#include "GpsGeolocationSource.hpp"
 #include "NavigationUtils.h"
 
 class BootstrapNavigation
@@ -17,14 +16,15 @@ public:
     {
         ESP_LOGI("NavBoostrap", "Initializing Navigation Module");
 
-        Serial2.setPins(5, 4);
+        // Serial2.setPins(5, 4);
         Serial2.begin(9600);
-        NavigationManagerInstance().InitializeUtils(&CompassInstance(), Serial2);
+        NavigationManagerInstance().InitializeUtils(&CompassInstance());
 
-        auto gpsTime = new GpsTimeSource(NavigationUtils::GetGPS());
         auto ezTime = new EzTimeSource();
-        System_Utils::TimeSources().push_back(gpsTime);
+        System_Utils::TimeSources().push_back(&GpsLocatorAndClock());
         System_Utils::TimeSources().push_back(ezTime);
+
+        NavigationModule::Utilities::LocationSources().push_back(&GpsLocatorAndClock());
     }
 
     static NavigationManager &NavigationManagerInstance()
@@ -41,9 +41,9 @@ public:
         return compass;
     }
 
-    static NavigationModule::GpsGeolocationSource &GpsLocator()
+    static NavigationModule::GpsSource &GpsLocatorAndClock()
     {
-        static NavigationModule::GpsGeolocationSource gpsLocator(NavigationModule::Utilities::GetGPS());
-        return gpsLocator;
+        static NavigationModule::GpsSource gpsLocatorAndClock(NavigationModule::Utilities::GetGPS(), Serial2);
+        return gpsLocatorAndClock;
     }
 };

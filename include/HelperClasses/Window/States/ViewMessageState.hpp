@@ -298,12 +298,37 @@ namespace DisplayModule
         {
             if (!_currentMsg) return "";
 
-            auto messageAge = NavigationUtils::GetTimeDifference(
-                _currentMsg->time,
-                _currentMsg->date
-            );
+            time_t now = 0;
+            time_t msgTime = NavigationModule::Utilities::PackedToTimeT(_currentMsg->time, _currentMsg->date);
 
-            return _currentMsg->GetMessageAge(messageAge);
+            if (msgTime <= 0 || now <= msgTime)
+            {
+                return "<1m";
+            }  
+
+            time_t diffSec = now - msgTime;
+
+            ESP_LOGV(TAG, "Time diff: %lld seconds", (long long)diffSec);
+
+            if (diffSec >= 86400)
+            {
+                return ">1d";
+            }
+
+            uint8_t diffHours   = diffSec / 3600;
+            uint8_t diffMinutes = (diffSec % 3600) / 60;
+
+            if (diffHours > 0)
+            {
+                return std::to_string(diffHours) + "h";
+            }
+
+            if (diffMinutes > 0)
+            {
+                return std::to_string(diffMinutes) + "m";
+            }
+
+            return "<1m";
         }
 
         std::string _displayMessageContent()
