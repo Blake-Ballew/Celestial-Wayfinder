@@ -78,8 +78,6 @@ namespace DisplayModule
         {
             clearDrawCommands();
 
-            NavigationUtils::UpdateGPS();
-
             // ── Time (right-aligned, line 2) ────────────────────────────────
             {
                 std::string timeStr;

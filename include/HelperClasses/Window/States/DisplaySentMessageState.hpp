@@ -98,13 +98,12 @@ namespace DisplayModule
                 return;
             }
 
-            auto timeDiff = NavigationUtils::GetTimeDifference(pingMsg->time, pingMsg->date);
-            std::string ageInfo = std::string("Sent ") + pingMsg->GetMessageAge(timeDiff) + " ago";
+            std::string ageInfo = std::string("Sent ") + _displayMessageAge(pingMsg) + " ago";
 
             auto distance = NavigationUtils::GetDistanceTo(pingMsg->lat, pingMsg->lng);
             std::string distanceInfo;
 
-            if (!NavigationUtils::IsGPSConnected())
+            if (distance == -1)
             {
                 distanceInfo = "Distance unknown";
             }
@@ -200,6 +199,43 @@ namespace DisplayModule
         std::string _getLineDivider()
         {
             return "=====================";
+        }
+
+        std::string _displayMessageAge(MessagePing *ping)
+        {
+            if (!ping) return "";
+
+            time_t now = 0;
+            time_t msgTime = NavigationModule::Utilities::PackedToTimeT(ping->time, ping->date);
+
+            if (msgTime <= 0 || now <= msgTime)
+            {
+                return "<1m";
+            }  
+
+            time_t diffSec = now - msgTime;
+
+            ESP_LOGV(TAG, "Time diff: %lld seconds", (long long)diffSec);
+
+            if (diffSec >= 86400)
+            {
+                return ">1d";
+            }
+
+            uint8_t diffHours   = diffSec / 3600;
+            uint8_t diffMinutes = (diffSec % 3600) / 60;
+
+            if (diffHours > 0)
+            {
+                return std::to_string(diffHours) + "h";
+            }
+
+            if (diffMinutes > 0)
+            {
+                return std::to_string(diffMinutes) + "m";
+            }
+
+            return "<1m";
         }
     };
 

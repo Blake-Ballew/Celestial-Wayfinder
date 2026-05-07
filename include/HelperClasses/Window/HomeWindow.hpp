@@ -221,14 +221,24 @@ namespace DisplayModule
                 auto payload = DynamicJsonDocument(256);
                 _selectMsgState->buildSelectPayload(payload);
 
-                NavigationUtils::UpdateGPS();
-                auto location = NavigationUtils::GetLocation();
+                double myLat, myLon = 0.0;
+                if (!NavigationUtils::GetCurrentLocation(myLat, myLon))
+                {
+                    DisplayModule::Utilities::clearAndDisplay(TextDrawCommand::createCenteredMessage("No Location Data"));
+                    popState();
+                    return;
+                }
+
+                time_t currentTime;
+                uint32_t gpsTime, gpsDate;
+                System_Utils::GetCurrentUTC(currentTime);
+                NavigationUtils::TimeTToGpsPacked(currentTime, gpsTime, gpsDate);
 
                 // TODO: UPDATE LORA MODULE TO USE SHARED PTR
                 // Build Message selector with preselection based on selected location (if applicable)
                 auto pingMessage = new MessagePing(
-                    NavigationUtils::GetTime().value(),
-                    NavigationUtils::GetDate().value(),
+                    gpsTime,
+                    gpsDate,
                     // We only broadcast. Hardcoded recipientId to 0x0 for backwards compatibility
                     0x0,
                     LoraUtils::UserID(),
@@ -237,8 +247,8 @@ namespace DisplayModule
                     LED_Utils::ThemeColor().r,
                     LED_Utils::ThemeColor().g,
                     LED_Utils::ThemeColor().b,
-                    location.lat(),
-                    location.lng(),
+                    myLat,
+                    myLon,
                     //TODO: use std::string for message content in MessagePing to avoid this c_str() nonsense
                     payload["Message"].as<const char *>()
                 );
@@ -321,15 +331,21 @@ namespace DisplayModule
                 {
                     const char* newLocName = (*payload)["return"].as<const char*>();
 
-                    NavigationUtils::UpdateGPS();
-                    auto location = NavigationUtils::GetLocation();
+                    double myLat, myLon;
+                    if (!NavigationUtils::GetCurrentLocation(myLat, myLon))
+                    {
+                        DisplayModule::Utilities::clearAndDisplay(TextDrawCommand::createCenteredMessage("No Location Data"));
+                        popState();
+                        return;
+                    }
+
                     SavedLocation newLoc;
                     newLoc.Name = newLocName;
-                    newLoc.Latitude = location.lat();
-                    newLoc.Longitude = location.lng();
+                    newLoc.Latitude = myLat;
+                    newLoc.Longitude = myLon;
 
                     NavigationUtils::AddSavedLocation(newLoc, true);
-                    ESP_LOGI(TAG, "Saved location: %s (%f, %f)", newLocName, location.lat(), location.lng());
+                    ESP_LOGI(TAG, "Saved location: %s (%f, %f)", newLocName, myLat, myLon);
 
                     auto &drawCtx = Utilities::drawContext();
                     drawCtx.display->fillScreen(BLACK);
@@ -474,15 +490,22 @@ namespace DisplayModule
             auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(2048);
             auto arr = (*doc).createNestedArray("Locations");
 
-            NavigationUtils::UpdateGPS();
-            auto location = NavigationUtils::GetLocation();
+            double myLat, myLon;
+            if (!NavigationUtils::GetCurrentLocation(myLat, myLon))
+            {
+                // I don't think we necessarily need to block this action since we have saved locations
+                // but I can't find a good way to indicate "unknown location" in the UI, so for now we'll just block broadcasting if we don't have a GPS fix
+                DisplayModule::Utilities::clearAndDisplay(TextDrawCommand::createCenteredMessage("No Location Data"));
+                return;
+            }
+
             JsonObject currentLoc = arr.createNestedObject();
             currentLoc["Name"] = "Ping";
-            currentLoc["Lat"] = location.lat();
-            currentLoc["Lng"] = location.lng();
+            currentLoc["Lat"] = myLat;
+            currentLoc["Lng"] = myLon;
 
             for (auto it = NavigationUtils::GetSavedLocationsBegin();
-                 it != NavigationUtils::GetSavedLocationsEnd(); ++it)
+                it != NavigationUtils::GetSavedLocationsEnd(); ++it)
             {
                 JsonObject locObj = arr.createNestedObject();
                 locObj["Name"] = it->Name;
