@@ -11,7 +11,7 @@ namespace DisplayModule
     public:
         ViewMessageState()
         {
-            refreshIntervalMs = 1000;
+            refreshIntervalMs = 15;
             
             bindInput(InputID::ENC_UP, "", [this](const InputContext &) {
                 if (!LoraUtils::IsUnreadMessageIteratorAtBeginning())
