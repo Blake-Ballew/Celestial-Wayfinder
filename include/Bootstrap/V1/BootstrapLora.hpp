@@ -5,6 +5,7 @@
 #include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
 #include "HelperClasses/PingMessage.hpp"
 #include "HelperClasses/WayfinderLoraState.hpp"
+#include "EventDeclarations.h"
 
 namespace
 {
@@ -33,6 +34,10 @@ public:
         LoraModule::Utilities::RegisterMessageType(PingMessage::GUID, PingMessage::Create);
 
         WayfinderLoraState::Init();
+
+        // Register the DIO0 ISR callback — StartReceiving() is deferred to RadioTask()
+        // so the radio does not enter RX mode until the task handle is set.
+        Driver().RegisterOnReceive(LoRaReceiveISR);
     }
 
     static ArduinoLoRaDriver& Driver()
@@ -49,6 +54,7 @@ public:
 
     static void RadioTaskRunner(void* pvParameters)
     {
+        radioReadTaskHandle = xTaskGetCurrentTaskHandle();
         Manager().RadioTask();
     }
 

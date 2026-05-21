@@ -1,4 +1,5 @@
 #include "EventDeclarations.h"
+#include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
 #include "globalDefines.h"
 #include "LED_Manager.h"
 #include "Display_Manager.h"
@@ -224,6 +225,25 @@ void IRAM_ATTR CompassDRDYISR()
     // ESP_EARLY_LOGD(TAG, "CompassDRDYISR");
 #endif
     // Navigation_Manager::read();
+}
+
+void IRAM_ATTR LoRaReceiveISR(int packetSize)
+{
+    if (radioReadTaskHandle != nullptr)
+    {
+        BaseType_t higherPriorityTaskWoken = pdFALSE;
+        vTaskNotifyGiveFromISR(radioReadTaskHandle, &higherPriorityTaskWoken);
+        portYIELD_FROM_ISR(higherPriorityTaskWoken);
+    }
+}
+
+void IRAM_ATTR ArduinoLoRaDriver::_onCadDone(bool channelBusy)
+{
+    if (_instance == nullptr) { return; }
+    _instance->_cadResult = channelBusy;
+    BaseType_t woken = pdFALSE;
+    xSemaphoreGiveFromISR(_cadSemaphore, &woken);
+    portYIELD_FROM_ISR(woken);
 }
 
 // void enableInterrupts()
