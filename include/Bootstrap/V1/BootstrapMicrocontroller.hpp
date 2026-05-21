@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <SPI.h>
 
 #include "EventDeclarations.h"
 #include "CompassUtils.h"
@@ -67,7 +68,13 @@ public:
         return encoder;
     }
 
-    static std::unordered_set<uint8_t> &ScannedDevices()
+    static SPIClass& SpiBus()
+    {
+        static SPIClass spi(HSPI);
+        return spi;
+    }
+
+    static std::unordered_set<uint8_t>& ScannedDevices()
     {
         static std::unordered_set<uint8_t> scannedDevices;
         return scannedDevices;

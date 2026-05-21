@@ -6,10 +6,11 @@
 
 #include <FastLED.h>
 
-#include "LoraManager.h"
+#include "LoraManager.hpp"
 #include "FilesystemUtils.h"
 #include "RpcUtils.h"
 #include "LED_Utils.h"
+#include "LED_Manager.h"
 #include "FilesystemManager.h"
 #include "EspNowManager.h"
 #include "Display_Manager.h"
@@ -21,7 +22,7 @@
 #include <map>
 #include "Bluetooth_Utils.h"
 
-#include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
+#include "HelperClasses/WayfinderLoraState.hpp"
 
 #include "ArduinoJson.h"
 #include "globalDefines.h"
@@ -34,7 +35,7 @@
 #include "GpsWindow.hpp"
 #include "DiagnosticsWindow.hpp"
 #include "EditSavedLocationsWindow.hpp"
-#include "EditStatusMessagesWindow.hpp"
+#include "HelperClasses/Window/EditStatusMessagesWindow.hpp"
 #include "WiFiRpcWindow.hpp"
 #include "PairBluetoothWindow.hpp"
 
@@ -68,9 +69,8 @@ class CompassUtils
 public:
 
     static uint8_t MessageReceivedInputID;
-    static ArduinoLoRaDriver ArduinoLora;
 
-    static void PassMessageReceivedToDisplay(uint32_t sendingUserID, bool isNew)
+    static void PassMessageReceivedToDisplay(std::shared_ptr<LoraModule::LoraMessageInterface> msg, bool isNew)
     {
         if (isNew)
         {
@@ -256,24 +256,8 @@ public:
             ESP_LOGI(TAG_COMPASS, "LED Interface::ThemeColor: %d, %d, %d", interfaceColor.r, interfaceColor.g, interfaceColor.b);
 
             // Lora Module
-            LoraUtils::SetUserName(doc["User Name"].as<std::string>());
-            LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"].as<uint8_t>());
-
-            // ArduinoLora.SetFrequency(frequency);
-            ArduinoLora.SetSpreadingFactor(7);
-            ArduinoLora.SetSignalBandwidth(125E3);
-
-            #if HARDWARE_VERSION == 1
-            ArduinoLora.SetTXPower(20);
-            #endif
-
-            #if HARDWARE_VERSION == 2
-            ArduinoLora.SetTXPower(23);
-            #endif
-
-            #if HARDWARE_VERSION == 3
-            ArduinoLora.SetTXPower(23);
-            #endif
+            LoraUtils::UserName()            = doc["User Name"].as<std::string>();
+            LoraUtils::DefaultSendAttempts() = doc["Num Broadcasts"] | (uint8_t)3;
 
             ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
         }
@@ -333,13 +317,13 @@ public:
         RpcModule::Utilities::RegisterRpc("GetSavedLocations", NavigationUtils::RpcGetSavedLocations);
 
         // Saved Messages
-        RpcModule::Utilities::RegisterRpc("AddSavedMessage", LoraUtils::RpcAddSavedMessage);
-        RpcModule::Utilities::RegisterRpc("AddSavedMessages", LoraUtils::RpcAddSavedMessages);
-        RpcModule::Utilities::RegisterRpc("DeleteSavedMessage", LoraUtils::RpcDeleteSavedMessage);
-        RpcModule::Utilities::RegisterRpc("DeleteSavedMessages", LoraUtils::RpcDeleteSavedMessages);
-        RpcModule::Utilities::RegisterRpc("GetSavedMessage", LoraUtils::RpcGetSavedMessage);
-        RpcModule::Utilities::RegisterRpc("GetSavedMessages", LoraUtils::RpcGetSavedMessages);
-        RpcModule::Utilities::RegisterRpc("UpdateSavedMessage", LoraUtils::RpcUpdateSavedMessage);
+        RpcModule::Utilities::RegisterRpc("AddSavedMessage", WayfinderLoraState::RpcAddSavedMessage);
+        RpcModule::Utilities::RegisterRpc("AddSavedMessages", WayfinderLoraState::RpcAddSavedMessages);
+        RpcModule::Utilities::RegisterRpc("DeleteSavedMessage", WayfinderLoraState::RpcDeleteSavedMessage);
+        RpcModule::Utilities::RegisterRpc("DeleteSavedMessages", WayfinderLoraState::RpcDeleteSavedMessages);
+        RpcModule::Utilities::RegisterRpc("GetSavedMessage", WayfinderLoraState::RpcGetSavedMessage);
+        RpcModule::Utilities::RegisterRpc("GetSavedMessages", WayfinderLoraState::RpcGetSavedMessages);
+        RpcModule::Utilities::RegisterRpc("UpdateSavedMessage", WayfinderLoraState::RpcUpdateSavedMessage);
 
         // Settings
         RpcModule::Utilities::RegisterRpc("GetSettings", FilesystemModule::Utilities::RpcGetSettingsFile);
@@ -378,19 +362,7 @@ public:
 
     static void ClearMessages(uint8_t inputID)
     {
-        LoraUtils::ClearSavedMessages();
-    }
-
-    static void BoundRadioTask(void *pvParameters)
-    {
-        LoraManager *manager = (LoraManager *)pvParameters;
-        manager->RadioTask();
-    }
-
-    static void BoundSendQueueTask(void *pvParameters)
-    {
-        LoraManager *manager = (LoraManager *)pvParameters;
-        manager->SendQueueTask();
+        WayfinderLoraState::ClearSavedMessages();
     }
 
     static void GetDisplayContentsRpc(JsonDocument &doc)

@@ -1,8 +1,14 @@
 #pragma once
 
+#include <memory>
+#include <vector>
+#include <string>
 #include "WindowState.hpp"
 #include "DisplayUtilities.hpp"
 #include "../../DrawCommands/LineCompassDrawCommand.hpp"
+#include "LoraUtils.h"
+#include "HelperClasses/WayfinderLoraState.hpp"
+#include "HelperClasses/PingMessage.hpp"
 
 namespace DisplayModule
 {
@@ -12,13 +18,12 @@ namespace DisplayModule
         ViewMessageState()
         {
             refreshIntervalMs = 15;
-            
+
             bindInput(InputID::ENC_UP, "", [this](const InputContext &) {
-                if (!LoraUtils::IsUnreadMessageIteratorAtBeginning())
+                if (_currIndex > 0)
                 {
                     _currIndex--;
-                    LoraUtils::DecrementUnreadMessageIterator();
-                    _currentMsg = LoraUtils::GetCurrentUnreadMessage();
+                    _cachedPing = WayfinderLoraState::GetUnreadMessage(_userIds[_currIndex]);
                 }
                 else if (_requestExitStateCallback)
                 {
@@ -31,15 +36,11 @@ namespace DisplayModule
             });
 
             bindInput(InputID::ENC_DOWN, "v", [this](const InputContext &) {
-                _currIndex++;
-                LoraUtils::IncrementUnreadMessageIterator();
-                if (LoraUtils::IsUnreadMessageIteratorAtEnd())
+                if (_currIndex + 1 < _userIds.size())
                 {
-                    LoraUtils::DecrementUnreadMessageIterator();
-                    _currIndex--;
+                    _currIndex++;
+                    _cachedPing = WayfinderLoraState::GetUnreadMessage(_userIds[_currIndex]);
                 }
-                else
-                    _currentMsg = LoraUtils::GetCurrentUnreadMessage();
                 _configureLed();
                 _rebuildDrawCommands();
             });
@@ -47,15 +48,19 @@ namespace DisplayModule
 
         void onEnter(const StateTransferData &data) override
         {
-            _currIndex = 1;
-            LoraUtils::ResetUnreadMessageIterator();
+            _userIds   = WayfinderLoraState::GetUnreadUserIds();
+            _currIndex = 0;
+            _cachedPing = nullptr;
+
+            if (!_userIds.empty())
+            {
+                _cachedPing = WayfinderLoraState::GetUnreadMessage(_userIds[0]);
+            }
 
             _ringPointId = RingPoint::RegisteredPatternID();
             ESP_LOGI(TAG, "Entering ViewMessageState with ring point ID %d", _ringPointId);
 
-            _currentMsg = LoraUtils::GetCurrentUnreadMessage();
             _configureLed();
-
             LED_Utils::enablePattern(_ringPointId);
 
             _rebuildDrawCommands();
@@ -68,42 +73,66 @@ namespace DisplayModule
 
         void onTick() override
         {
-            ESP_LOGI(TAG, "ViewMessageState tick: current index %d", _currIndex);
+            // Non-blocking cache refresh — keeps renders fast at 15 ms interval.
+            // Falls back to cached value if the LoRa task holds the mutex.
+            if (_currIndex < _userIds.size())
+            {
+                auto fresh = WayfinderLoraState::TryGetUnreadMessage(_userIds[_currIndex]);
+                if (fresh) { _cachedPing = fresh; }
+            }
 
             _configureLed();
             _rebuildDrawCommands();
         }
 
-        MessageBase *currentMessage() const { return _currentMsg; }
+        // Returns the currently displayed message (may be nullptr if list is empty).
+        std::shared_ptr<LoraModule::LoraMessageInterface> currentMessage() const
+        {
+            return _cachedPing;
+        }
+
+        // Marks the current message as read, removes it from the local list, and
+        // refreshes the cache. Returns true if more unread messages remain.
+        bool markCurrentRead()
+        {
+            if (_userIds.empty()) { return false; }
+
+            WayfinderLoraState::MarkRead(_userIds[_currIndex]);
+            _userIds.erase(_userIds.begin() + _currIndex);
+
+            if (_currIndex >= _userIds.size() && _currIndex > 0) { _currIndex--; }
+
+            _cachedPing = _userIds.empty()
+                ? nullptr
+                : WayfinderLoraState::GetUnreadMessage(_userIds[_currIndex]);
+
+            _configureLed();
+            _rebuildDrawCommands();
+            return !_userIds.empty();
+        }
 
     private:
-        uint32_t _currUserIdLookup = 0;
-        size_t _currIndex = 1;
+        std::vector<uint32_t> _userIds;
+        size_t _currIndex = 0;
+        std::shared_ptr<PingMessage> _cachedPing;
+
+        int _ringPointId = -1;
+        std::function<void()> _requestExitStateCallback;
 
         const uint8_t _LARGE_DISPLAY_MIN_LINES = 16;
         const uint8_t _MED_DISPLAY_MIN_LINES = 8;
         const uint8_t _MIN_DISPLAY_MIN_LINES = 4;
 
-        MessageBase *_currentMsg = nullptr;
-        int _ringPointId = -1;
-
-        std::function<void()> _requestExitStateCallback;
-
         void _configureLed()
         {
+            if (!_cachedPing) { return; }
+
             StaticJsonDocument<256> cfg;
-            auto pingMsg = static_cast<MessagePing *>(_currentMsg);
+            cfg["rOverride"] = _cachedPing->color_R;
+            cfg["gOverride"] = _cachedPing->color_G;
+            cfg["bOverride"] = _cachedPing->color_B;
 
-            if (!pingMsg)
-            {
-                return;
-            }
-
-            cfg["rOverride"] = pingMsg->color_R;
-            cfg["gOverride"] = pingMsg->color_G;
-            cfg["bOverride"] = pingMsg->color_B;
-
-            double distance = NavigationUtils::GetDistanceTo(pingMsg->lat, pingMsg->lng);
+            double distance = NavigationUtils::GetDistanceTo(_cachedPing->lat, _cachedPing->lng);
 
             const size_t ledFxMin = 20;
             const size_t ledFxMax = 500;
@@ -111,7 +140,7 @@ namespace DisplayModule
             if (distance > ledFxMax)
             {
                 distance = ledFxMax;
-            } 
+            }
             else if (distance < ledFxMin)
             {
                 distance = ledFxMin;
@@ -129,7 +158,8 @@ namespace DisplayModule
 
         void _rebuildDrawCommands()
         {
-            if (LoraUtils::GetNumUnreadMessages() != _currIndex)
+            // Show/hide ENC_DOWN arrow based on whether a next message exists
+            if (_currIndex + 1 < _userIds.size())
             {
                 bindInput(InputID::ENC_DOWN, "v");
             }
@@ -144,7 +174,7 @@ namespace DisplayModule
 
             addDrawCommand(std::make_shared<LineCompassDrawCommand>(
                 static_cast<int>(_getMessageHeading()),
-                _getMessageDistance(), 
+                _getMessageDistance(),
                 1));
 
             if (displayLines >= _LARGE_DISPLAY_MIN_LINES)
@@ -248,8 +278,7 @@ namespace DisplayModule
 
         std::string _displayIndex()
         {
-            auto totalUnread = LoraUtils::GetNumUnreadMessages();
-            return "[" + std::to_string(_currIndex) + " of " + std::to_string(totalUnread) + "]";
+            return "[" + std::to_string(_currIndex + 1) + " of " + std::to_string(_userIds.size()) + "]";
         }
 
         std::string _getLineDivider()
@@ -259,8 +288,8 @@ namespace DisplayModule
 
         std::string _displayUserName()
         {
-            if (!_currentMsg) return "";
-            return std::string(_currentMsg->senderName);
+            if (!_cachedPing) { return ""; }
+            return _cachedPing->senderName;
         }
 
         std::string _displaySenderLine()
@@ -268,11 +297,10 @@ namespace DisplayModule
             static constexpr size_t LINE_WIDTH = 21;
             static constexpr const char *PREFIX = "From ";
 
-            std::string name(_currentMsg->senderName);
+            std::string name = _cachedPing ? _cachedPing->senderName : "";
             size_t prefixLen = strlen(PREFIX);
             size_t maxName = LINE_WIDTH - prefixLen - 1 - 1;
-            if (name.length() > maxName)
-                name = name.substr(0, maxName);
+            if (name.length() > maxName) { name = name.substr(0, maxName); }
 
             size_t fillLen = LINE_WIDTH - prefixLen - 1 - name.length();
             return std::string(PREFIX) + std::string(fillLen, '-') + " " + name;
@@ -286,8 +314,7 @@ namespace DisplayModule
             std::string age = _displayMessageAge() + " ago";
             size_t prefixLen = strlen(PREFIX);
             size_t maxAge = LINE_WIDTH - prefixLen - 1 - 1;
-            if (age.length() > maxAge)
-                age = age.substr(0, maxAge);
+            if (age.length() > maxAge) { age = age.substr(0, maxAge); }
 
             size_t fillLen = LINE_WIDTH - prefixLen - 1 - age.length();
             return std::string(PREFIX) + std::string(fillLen, '-') + " " + age;
@@ -296,83 +323,53 @@ namespace DisplayModule
         // TODO: Measure time from GPS date/time and message date/time
         std::string _displayMessageAge()
         {
-            if (!_currentMsg) return "";
+            if (!_cachedPing) { return ""; }
 
             time_t now = 0;
-            time_t msgTime = NavigationModule::Utilities::PackedToTimeT(_currentMsg->time, _currentMsg->date);
+            time_t msgTime = NavigationModule::Utilities::PackedToTimeT(_cachedPing->time, _cachedPing->date);
 
             if (msgTime <= 0 || now <= msgTime)
             {
                 return "<1m";
-            }  
+            }
 
             time_t diffSec = now - msgTime;
-
             ESP_LOGV(TAG, "Time diff: %lld seconds", (long long)diffSec);
 
-            if (diffSec >= 86400)
-            {
-                return ">1d";
-            }
+            if (diffSec >= 86400) { return ">1d"; }
 
             uint8_t diffHours   = diffSec / 3600;
             uint8_t diffMinutes = (diffSec % 3600) / 60;
 
-            if (diffHours > 0)
-            {
-                return std::to_string(diffHours) + "h";
-            }
-
-            if (diffMinutes > 0)
-            {
-                return std::to_string(diffMinutes) + "m";
-            }
+            if (diffHours > 0)   { return std::to_string(diffHours) + "h"; }
+            if (diffMinutes > 0) { return std::to_string(diffMinutes) + "m"; }
 
             return "<1m";
         }
 
         std::string _displayMessageContent()
         {
-            if (!_currentMsg) return "";
-            auto ping = static_cast<MessagePing *>(_currentMsg);
-            return std::string(ping->status);
-        }
-
-        // Probably don't need these two
-        std::string _displayFromTag()
-        {
-            return "From";
-        }
-        
-        std::string _displayMsgAgeTag()
-        {
-            return "Msg Age";
+            if (!_cachedPing) { return ""; }
+            return std::string(_cachedPing->status);
         }
 
         float _getMessageHeading()
         {
-            if (!_currentMsg) return 0;
-            auto pingMsg = static_cast<MessagePing *>(_currentMsg);
+            if (!_cachedPing) { return 0; }
 
-            double heading = NavigationUtils::GetHeadingTo(pingMsg->lat, pingMsg->lng);
+            double heading = NavigationUtils::GetHeadingTo(_cachedPing->lat, _cachedPing->lng);
             int azimuth = NavigationUtils::GetAzimuth();
 
             float directionDegrees = heading - azimuth;
-
-            if (directionDegrees < 0)
-            {
-                directionDegrees += 360;
-            }
+            if (directionDegrees < 0) { directionDegrees += 360; }
 
             return directionDegrees;
         }
 
         int _getMessageDistance()
         {
-            if (!_currentMsg) return 0;
-            auto ping = static_cast<MessagePing *>(_currentMsg);
-            
-            double distance = NavigationUtils::GetDistanceTo(ping->lat, ping->lng);
+            if (!_cachedPing) { return 0; }
+            double distance = NavigationUtils::GetDistanceTo(_cachedPing->lat, _cachedPing->lng);
             return static_cast<int>(distance);
         }
     };

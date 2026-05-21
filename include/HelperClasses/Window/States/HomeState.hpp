@@ -11,6 +11,7 @@
 #include "NavigationUtils.h"
 #include "LoraUtils.h"
 #include "System_Utils.h"
+#include "HelperClasses/WayfinderLoraState.hpp"
 #include <ArduinoJson.h>
 
 namespace DisplayModule
@@ -113,13 +114,13 @@ namespace DisplayModule
             ));
 
             // ── Last-broadcast scroll hint (ENC_UP → WindowLayer draws "^") ──
-            if (LoraUtils::MyLastBroacastExists())
+            if (LoraModule::Utilities::MyLastBroadcastExists())
                 bindInput(InputID::ENC_UP, "^");
             else
                 bindInput(InputID::ENC_UP, "");
 
             // ── Unread messages indicator ────────────────────────────────────
-            size_t unread = LoraUtils::GetNumUnreadMessages();
+            size_t unread = WayfinderLoraState::GetNumUnread();
             if (unread > 0)
             {
                 bindInput(InputID::ENC_DOWN, "v");

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "MessagePing.h"
+#include "HelperClasses/PingMessage.hpp"
 #include "WindowState.hpp"
 #include "TextDrawCommand.hpp"
 #include "LoraUtils.h"
@@ -34,19 +34,15 @@ namespace DisplayModule
         {
         }
 
-        ~DisplaySentMessageState()
-        {
-            _deleteMessage();
-        }
-
         // ------------------------------------------------------------------
         // Lifecycle
         // ------------------------------------------------------------------
 
         void onEnter(const StateTransferData &) override
         {
-            _deleteMessage();
-            _message    = LoraUtils::MyLastBroacast();
+            _message = nullptr;
+            auto base = LoraUtils::MyLastBroadcast();
+            _message = std::static_pointer_cast<PingMessage>(base);
             _hasMessage = (_message != nullptr);
 
             _rebuildDrawCommands();
@@ -54,17 +50,13 @@ namespace DisplayModule
 
         void onExit() override
         {
-            _deleteMessage();
+            _message = nullptr;
             WindowState::onExit();
         }
 
-        // ------------------------------------------------------------------
-        // Result payload for retransmit (call before the state exits)
-        // ------------------------------------------------------------------
-
         std::shared_ptr<ArduinoJson::DynamicJsonDocument> buildRetransmitPayload() const
         {
-            if (!_message) return nullptr;
+            if (!_message) { return nullptr; }
             auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(512);
             _message->serialize(*doc);
             return doc;
@@ -73,24 +65,17 @@ namespace DisplayModule
         bool hasMessage() const { return _hasMessage; }
 
     private:
-        MessageBase *_message = nullptr;
-        bool        _hasMessage = false;
+        std::shared_ptr<PingMessage> _message;
+        bool _hasMessage = false;
 
         const uint8_t _LARGE_DISPLAY_MIN_LINES = 16;
         const uint8_t _MED_DISPLAY_MIN_LINES = 8;
         const uint8_t _MIN_DISPLAY_MIN_LINES = 4;
 
-        void _deleteMessage()
-        {
-            delete _message;
-            _message  = nullptr;
-            _hasMessage = false;
-        }
-
         void _rebuildDrawCommands()
         {
             clearDrawCommands();
-            auto pingMsg = static_cast<MessagePing *>(_message);
+            auto pingMsg = _message;
 
             if (!_message)
             {
@@ -201,7 +186,7 @@ namespace DisplayModule
             return "=====================";
         }
 
-        std::string _displayMessageAge(MessagePing *ping)
+        std::string _displayMessageAge(const std::shared_ptr<PingMessage>& ping)
         {
             if (!ping) return "";
 

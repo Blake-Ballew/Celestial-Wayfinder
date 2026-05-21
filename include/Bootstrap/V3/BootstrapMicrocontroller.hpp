@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <SPI.h>
 
 #include "EventDeclarations.h"
 #include "CompassUtils.h"
@@ -11,6 +12,10 @@
 
 #define SDA_PIN 18
 #define SCL_PIN 17
+
+#define LORA_SPI_SCK  40
+#define LORA_SPI_MISO 42
+#define LORA_SPI_MOSI 41
 
 class BootstrapMicrocontroller
 {
@@ -37,6 +42,9 @@ public:
         Encoder().setCount(0);
         
         inputEncoder = &Encoder();
+
+        ESP_LOGI("BootstrapMicro", "Initializing SPI bus...");
+        SpiBus().begin(LORA_SPI_SCK, LORA_SPI_MISO, LORA_SPI_MOSI, -1);
 
         ESP_LOGI("BootstrapMicro", "Initializing I2C bus...");
         auto wireSuccess = I2cBus().begin(SDA_PIN, SCL_PIN);
@@ -65,12 +73,18 @@ public:
         return encoder;
     }
 
-    static std::unordered_set<uint8_t> &ScannedDevices()
+    static SPIClass& SpiBus()
+    {
+        static SPIClass spi;
+        return spi;
+    }
+
+    static std::unordered_set<uint8_t>& ScannedDevices()
     {
         static std::unordered_set<uint8_t> scannedDevices;
         return scannedDevices;
     }
 
 private:
-    
+
 };

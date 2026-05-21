@@ -1,6 +1,6 @@
 #include "LoraDriverInterface.h"
 #include <LoRa.h>
-#include "esp_log.h"
+#include <esp_log.h>
 
 static const char *TAG_LORA = "LORA";
 
@@ -54,66 +54,34 @@ public:
         return result;
     }
 
-    bool ReceiveMessage(JsonDocument &doc, size_t timeout = 0)
+    bool ReceiveMessage(uint8_t* buffer, size_t& outLen, size_t timeout) override
     {
         auto startTime = xTaskGetTickCount();
 
         do
         {
-            size_t msgSize = 0;
-            uint8_t buffer[256];
-            memset(buffer, 0, sizeof(buffer));
+            if (LoRa.parsePacket() == 0) { continue; }
 
-            if (LoRa.parsePacket() == 0) continue;
-
+            outLen = 0;
             while (LoRa.available())
             {
-                buffer[msgSize] = (uint8_t)(LoRa.read() & 0xFF);
-                msgSize++;
+                buffer[outLen++] = (uint8_t)(LoRa.read() & 0xFF);
             }
 
-            if (msgSize == 0) continue;
-
-            #if DEBUG == 1
-            // ESP_LOGD(TAG_LORA, "Message of length %d received", msgSize);
-            // for (auto i = 0; i < msgSize; i++)
-            // {
-            //     printf("%02X ", buffer[i]);
-            // }
-            // printf("\n");
-            #endif
-
-            auto result = deserializeMsgPack(doc, (const uint8_t *)buffer, sizeof(buffer));
-
-#if DEBUG == 1
-            ESP_LOGD(TAG_LORA, "Deserialization result: %d", result.code());
-#endif
-            return result.code() == DeserializationError::Ok;
+            return outLen > 0;
         }
         while ((xTaskGetTickCount() - startTime) < timeout);
 
         return false;
     }
 
-    bool SendMessage(JsonDocument &doc)
+    bool SendMessage(const uint8_t* buffer, size_t len) override
     {
-        auto msgSize = measureMsgPack(doc);
-        // uint8_t buffer[msgSize];
-        // memset(buffer, 0, msgSize);
-
-        // serializeMsgPack(doc, buffer, sizeof(buffer));
-
-        #if DEBUG == 1
-        ESP_LOGD(TAG_LORA, "Sending message:");
-        serializeJson(doc, Serial);
-        #endif
-
         if (LoRa.beginPacket())
         {
-            serializeMsgPack(doc, LoRa);
+            LoRa.write(buffer, len);
             return LoRa.endPacket() == 1;
         }
-        
         return false;
     }
 

@@ -5,6 +5,7 @@
 
 #include "NavigationManager.h"
 #include "GpsSource.hpp"
+#include "StaticLocation.hpp"
 #include "EzTimeSource.hpp"
 #include "NavigationUtils.h"
 
@@ -25,6 +26,7 @@ public:
         System_Utils::TimeSources().push_back(ezTime);
 
         NavigationModule::Utilities::LocationSources().push_back(&GpsLocatorAndClock());
+        NavigationModule::Utilities::LocationSources().push_back(&StaticLocationSource());
     }
 
     static NavigationManager &NavigationManagerInstance()
@@ -45,5 +47,15 @@ public:
     {
         static NavigationModule::GpsSource gpsLocatorAndClock(NavigationModule::Utilities::GetGPS(), Serial2);
         return gpsLocatorAndClock;
+    }
+
+    static NavigationModule::StaticLocation &StaticLocationSource()
+    {
+        static NavigationModule::StaticLocation staticLocationSource(
+            // Coordinates of San Francisco
+            37.7749,   // Latitude
+            -122.4194  // Longitude
+        );
+        return staticLocationSource;
     }
 };
