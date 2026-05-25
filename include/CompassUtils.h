@@ -31,6 +31,9 @@
 
 #include "HelperClasses/Window/HomeWindow.hpp"
 #include "HelperClasses/Window/CompassWindow.hpp"
+#if HARDWARE_VERSION >= 3
+    #include "HelperClasses/Window/BreakoutWindow.hpp"
+#endif
 #include "GpsWindow.hpp"
 #include "DiagnosticsWindow.hpp"
 #include "EditSavedLocationsWindow.hpp"
@@ -394,6 +397,12 @@ public:
             auto diagnosticsWindow = std::make_shared<DisplayModule::DiagnosticsWindow>();
             DisplayModule::Utilities::pushWindow(diagnosticsWindow);
         }));
+        #if HARDWARE_VERSION >= 3
+        menuItems.push_back(DisplayModule::MenuItem("Breakout", []()
+        {
+            DisplayModule::Utilities::pushWindow(std::make_shared<DisplayModule::BreakoutWindow>());
+        }));
+        #endif
         menuItems.push_back(DisplayModule::MenuItem("Reboot", []()
         {
             auto drawCtx = DisplayModule::Utilities::drawContext();
