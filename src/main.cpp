@@ -46,6 +46,8 @@
     #error "Unknown HARDWARE_VERSION. Must be 1, 2, or 3."
 #endif
 
+#include "Bootstrap/Common/BootstrapRpc.hpp"
+
 extern "C"
 {
 #include "bootloader_random.h"
@@ -59,7 +61,7 @@ void Bootstrap();
 void setup()
 {
   Serial.begin(115200);
-  vTaskDelay(1000);
+  vTaskDelay(pdMS_TO_TICKS(100));
 
   bootloader_random_enable();
   
@@ -68,12 +70,9 @@ void setup()
   
   vTaskDelay(300);
 
-  // Initialize RPC
-  CompassUtils::InitializeRpc(1, BootstrapMicrocontroller::CPU_CORE_LORA);
+  // CompassUtils::WireFunctions();
 
-  CompassUtils::WireFunctions();
-
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  // vTaskDelay(1000 / portTICK_PERIOD_MS);
 
   System_Utils::getEnableInterrupts() += enableInterruptsHandler;
   System_Utils::getDisableInterrupts() += disableInterruptsHandler;
@@ -129,5 +128,6 @@ void Bootstrap()
   BootstrapNavigation::Initialize();
   BootstrapDisplay::Inititalize();
   BootstrapLora::Initialize();
+  BootstrapRpc::Initialize();
 }
 

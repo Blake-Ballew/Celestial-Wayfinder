@@ -332,20 +332,6 @@ public:
         RpcModule::Utilities::RegisterRpc("RestartSystem", [](JsonDocument &_) { ESP.restart();  vTaskDelay(1000 / portTICK_PERIOD_MS); });
         RpcModule::Utilities::RegisterRpc("GetSystemInfo", System_Utils::GetSystemInfoRpc);
         RpcModule::Utilities::RegisterRpc("GetDisplayContents", GetDisplayContentsRpc);
-
-        // Receive WiFi Credentials
-        RpcModule::Utilities::RegisterRpc("BroadcastWifiCredentials", [](JsonDocument &doc) 
-        { 
-            if (doc.containsKey("SSID") && doc.containsKey("Password"))
-            {
-                auto result = ConnectivityModule::RadioUtils::ConnectToAccessPoint(doc["SSID"].as<std::string>(), doc["Password"].as<std::string>());
-
-                if (result)
-                {
-                    ConnectivityModule::Utilities::DeinitializeEspNow().Invoke(false);
-                }
-            }
-        });
     }
 
     static void ClearLocations(uint8_t inputID)
