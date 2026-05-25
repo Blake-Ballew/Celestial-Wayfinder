@@ -5,6 +5,8 @@
 
 class BootstrapRpc
 {
+public:
+
     static void Initialize()
     {
         ESP_LOGI("BootstrapRpc", "Initializing RPC...");
