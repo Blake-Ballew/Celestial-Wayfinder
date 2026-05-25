@@ -66,6 +66,14 @@ namespace DisplayModule
             _rebuildDrawCommands();
         }
 
+        void onExit() override
+        {
+            LED_Utils::disablePattern(_ringPointId);
+            _cachedPing = nullptr;
+            _userIds.clear();
+            _currIndex = 0;
+        }
+
         void assignExitCallback(std::function<void()> cb)
         {
             _requestExitStateCallback = std::move(cb);
@@ -186,17 +194,23 @@ namespace DisplayModule
                     fmt
                 ));
 
+                fmt.hAlign = TextAlignH::CENTER;
                 fmt.line = 3;
-                fmt.hAlign = TextAlignH::LEFT;
                 addDrawCommand(std::make_shared<TextDrawCommand>(
-                    _displaySenderLine(),
+                    _displayMessageHeader(),
                     fmt
                 ));
 
-                fmt.hAlign = TextAlignH::LEFT;
                 fmt.line = 4;
+                fmt.hAlign = TextAlignH::LEFT;
                 addDrawCommand(std::make_shared<TextDrawCommand>(
-                    _displayAgeLine(),
+                    _displayUserName(),
+                    fmt
+                ));
+
+                fmt.hAlign = TextAlignH::RIGHT;
+                addDrawCommand(std::make_shared<TextDrawCommand>(
+                    _displayMessageAge(),
                     fmt
                 ));
 
@@ -222,17 +236,23 @@ namespace DisplayModule
                     fmt
                 ));
 
+                fmt.hAlign = TextAlignH::CENTER;
                 fmt.line = 3;
-                fmt.hAlign = TextAlignH::LEFT;
                 addDrawCommand(std::make_shared<TextDrawCommand>(
-                    _displaySenderLine(),
+                    _displayMessageHeader(),
                     fmt
                 ));
 
-                fmt.hAlign = TextAlignH::LEFT;
                 fmt.line = 4;
+                fmt.hAlign = TextAlignH::LEFT;
                 addDrawCommand(std::make_shared<TextDrawCommand>(
-                    _displayAgeLine(),
+                    _displayUserName(),
+                    fmt
+                ));
+
+                fmt.hAlign = TextAlignH::RIGHT;
+                addDrawCommand(std::make_shared<TextDrawCommand>(
+                    _displayMessageAge(),
                     fmt
                 ));
 
@@ -288,36 +308,25 @@ namespace DisplayModule
 
         std::string _displayUserName()
         {
+            static constexpr size_t LINE_WIDTH = 21;
             if (!_cachedPing) { return ""; }
-            return _cachedPing->senderName;
+
+            char hex[5];
+            snprintf(hex, sizeof(hex), "%04" PRIX32, _cachedPing->sender & 0xFFFF);
+            std::string suffix = std::string("#") + hex;
+
+            std::string name = _cachedPing->senderName;
+            if (name.length() + suffix.length() > LINE_WIDTH)
+            {
+                name = name.substr(0, LINE_WIDTH - suffix.length());
+            }
+
+            return name + suffix;
         }
 
-        std::string _displaySenderLine()
+        std::string _displayMessageHeader()
         {
-            static constexpr size_t LINE_WIDTH = 21;
-            static constexpr const char *PREFIX = "From ";
-
-            std::string name = _cachedPing ? _cachedPing->senderName : "";
-            size_t prefixLen = strlen(PREFIX);
-            size_t maxName = LINE_WIDTH - prefixLen - 1 - 1;
-            if (name.length() > maxName) { name = name.substr(0, maxName); }
-
-            size_t fillLen = LINE_WIDTH - prefixLen - 1 - name.length();
-            return std::string(PREFIX) + std::string(fillLen, '-') + " " + name;
-        }
-
-        std::string _displayAgeLine()
-        {
-            static constexpr size_t LINE_WIDTH = 21;
-            static constexpr const char *PREFIX = "Rcvd ";
-
-            std::string age = _displayMessageAge() + " ago";
-            size_t prefixLen = strlen(PREFIX);
-            size_t maxAge = LINE_WIDTH - prefixLen - 1 - 1;
-            if (age.length() > maxAge) { age = age.substr(0, maxAge); }
-
-            size_t fillLen = LINE_WIDTH - prefixLen - 1 - age.length();
-            return std::string(PREFIX) + std::string(fillLen, '-') + " " + age;
+            return "From         Msg Age";
         }
 
         // TODO: Measure time from GPS date/time and message date/time
@@ -358,12 +367,17 @@ namespace DisplayModule
             if (!_cachedPing) { return 0; }
 
             double heading = NavigationUtils::GetHeadingTo(_cachedPing->lat, _cachedPing->lng);
-            int azimuth = NavigationUtils::GetAzimuth();
+            auto bearing = NavigationUtils::GetBearing(heading);
 
-            float directionDegrees = heading - azimuth;
-            if (directionDegrees < 0) { directionDegrees += 360; }
+            ESP_LOGI(TAG, "Current Heading: %d, Message Heading: %.4f, Bearing: %f ", NavigationUtils::GetAzimuth(), heading, bearing);
 
-            return directionDegrees;
+            return bearing;
+            // int azimuth = NavigationUtils::GetAzimuth();
+
+            // float directionDegrees = heading - azimuth;
+            // if (directionDegrees < 0) { directionDegrees += 360; }
+
+            // return directionDegrees;
         }
 
         int _getMessageDistance()

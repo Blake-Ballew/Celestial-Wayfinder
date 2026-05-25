@@ -53,7 +53,7 @@ public:
 
         LoRa.setCodingRate4(8);
         LoRa.setSpreadingFactor(7);
-        LoRa.setSignalBandwidth(125E3);
+        LoRa.setSignalBandwidth(500E3);
         LoRa.setPreambleLength(12);
         LoRa.setSPIFrequency(_spiFrequency);
         return result;

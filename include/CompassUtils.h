@@ -19,7 +19,6 @@
 
 #include "RpcManager.h"
 #include "SettingsInterface.hpp"
-#include <map>
 #include "Bluetooth_Utils.h"
 
 #include "HelperClasses/WayfinderLoraState.hpp"
@@ -149,63 +148,57 @@ public:
         System_Utils::DeviceID = deviceInfo.getUInt("UserID");
     }
 
-    static std::map<std::string, std::shared_ptr<FilesystemModule::SettingsInterface>> GenerateSettings()
+    static std::vector<std::shared_ptr<FilesystemModule::SettingsInterface>> GenerateSettings()
     {
-        std::map<std::string, std::shared_ptr<FilesystemModule::SettingsInterface>> settings;
+        std::vector<std::shared_ptr<FilesystemModule::SettingsInterface>> settings;
 
-        std::string defaultUserName;
         std::string defaultDeviceName;
-        {
-            char usernamebuffer[10];
-            sprintf(usernamebuffer, "User_%04X", FilesystemModule::Utilities::DeviceInfo().getUInt("UserID") & 0xFFFF);
-            defaultUserName = usernamebuffer;
-        }
         {
             char devicenamebuffer[20];
             sprintf(devicenamebuffer, "Beacon_%04X", FilesystemModule::Utilities::DeviceInfo().getUInt("UserID") & 0xFFFF);
             defaultDeviceName = devicenamebuffer;
         }
-        
-        auto userName = std::make_shared<FilesystemModule::StringSetting>("User Name", defaultUserName, 12);
-        settings[userName->key] = userName;
+
+        auto userName = std::make_shared<FilesystemModule::StringSetting>("User Name", "User", 12);
+        settings.push_back(userName);
 
         auto deviceName = std::make_shared<FilesystemModule::StringSetting>("Device Name", defaultDeviceName, 20);
-        settings[deviceName->key] = deviceName;
+        settings.push_back(deviceName);
 
         std::vector<std::string> colorThemeOptions = {"Custom", "Red", "Green", "Blue", "Purple", "Yellow", "Cyan", "White", "Orange"};
         std::vector<int> colorThemeValues = {0, 1, 2, 3, 4, 5, 6, 7, 8};
         auto colorTheme = std::make_shared<FilesystemModule::EnumSetting>("Theme Color", 2, colorThemeOptions, colorThemeValues);
-        settings[colorTheme->key] = colorTheme;
+        settings.push_back(colorTheme);
 
         auto themeRed = std::make_shared<FilesystemModule::IntSetting>("Theme Color Red", 0, 0, 255, 1);
-        settings[themeRed->key] = themeRed;
+        settings.push_back(themeRed);
 
         auto themeGreen = std::make_shared<FilesystemModule::IntSetting>("Theme Color Green", 255, 0, 255, 1);
-        settings[themeGreen->key] = themeGreen;
+        settings.push_back(themeGreen);
 
         auto themeBlue = std::make_shared<FilesystemModule::IntSetting>("Theme Color Blue", 0, 0, 255, 1);
-        settings[themeBlue->key] = themeBlue;
+        settings.push_back(themeBlue);
 
         // TODO: dumb this down to walkie-talkie style channels
         auto frequency = std::make_shared<FilesystemModule::FloatSetting>("Frequency", 914.9, 902.3, 914.9, 0.2);
-        settings[frequency->key] = frequency;
+        settings.push_back(frequency);
 
         auto broadcastAttempts = std::make_shared<FilesystemModule::IntSetting>("Num Broadcasts", 3, 1, 5, 1);
-        settings[broadcastAttempts->key] = broadcastAttempts;
+        settings.push_back(broadcastAttempts);
 
         System_Utils::GenerateDefaultSettings(settings);
 
         std::vector<std::string> wifiOptions = {"Off", "AP Mode", "Station Mode"};
         std::vector<int> wifiValues = {0, 1, 2};
         auto wifiProvisioning = std::make_shared<FilesystemModule::EnumSetting>("WiFi Mode", 0, wifiOptions, wifiValues);
-        settings[wifiProvisioning->key] = wifiProvisioning;
+        settings.push_back(wifiProvisioning);
 
         auto wifiapPassword = std::make_shared<FilesystemModule::StringSetting>("WiFi AP Password", "esp-pass", 21);
-        settings[wifiapPassword->key] = wifiapPassword;
+        settings.push_back(wifiapPassword);
 
         for (const auto& setting : settings)
         {
-            setting.second->loadFromPreferences(FilesystemModule::Utilities::SettingsPreference());
+            setting->loadFromPreferences(FilesystemModule::Utilities::SettingsPreference());
         }
 
         return settings;
@@ -385,266 +378,6 @@ public:
     }
 
     // Display Module
-
-    static void InitializeDisplayManager()
-    {
-        ESP_LOGI(TAG, "Initializing display driver...");
-        auto displayPtr = InitializeDisplayDriver();
-
-        DisplayManagerInstance.Initialize(displayPtr, OLED_WIDTH, OLED_HEIGHT); 
-
-        DisplayModule::initDefaultLayers();
-
-        // Wire up input draw commands
-        auto windowLayer = std::static_pointer_cast<DisplayModule::WindowLayer>(DisplayModule::Utilities::getLayer(DisplayModule::LayerID::WINDOW));
-
-#if HARDWARE_VERSION == 1
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd("^", fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd("v", fmt);
-            cmd.draw(drawCtx);
-        });
-
-#elif HARDWARE_VERSION == 2
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd("^", fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd("v", fmt);
-            cmd.draw(drawCtx);
-        });
-
-#elif HARDWARE_VERSION == 3
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd("^", fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd("v", fmt);
-            cmd.draw(drawCtx);
-        });
-
-#endif
-
-#if HARDWARE_VERSION < 3 || defined(USE_V3_OLED)
-        DisplayModule::Utilities::onRenderComplete += []()
-        {
-            display.display();
-        };
-#endif
-
-        InitializeHomeWindow();
-    }
-
-    static Adafruit_GFX *InitializeDisplayDriver()
-    {
-#if HARDWARE_VERSION < 3
-        display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-        display.clearDisplay();
-
-        display.setTextSize(1);
-        display.setTextColor(SSD1306_WHITE);
-        display.setCursor(0, 0);
-        display.display();
-
-        return static_cast<Adafruit_GFX *>(&display);
-#else
-#ifdef USE_V3_OLED
-        ESP_LOGI(TAG, "Initializing SSD1327...");
-        auto result = display.begin(0x3C);
-
-        if (result)
-        {
-            ESP_LOGI(TAG, "SSD1327 Initialized.");
-            display.setRotation(2);
-            display.clearDisplay();
-            display.setContrast(0x7F);
-            display.setTextColor(SSD1327_WHITE);
-        }
-        else
-        {
-            ESP_LOGW(TAG, "SSD1327 Failed to initialize.");
-        }
-#else
-        display.setTextColor(WHITE);
-#endif
-
-        display.setTextSize(1);
-        display.setCursor(0, 0);
-        return static_cast<Adafruit_GFX *>(&display);
-#endif
-    }
 
     static void InitializeHomeWindow()
     {

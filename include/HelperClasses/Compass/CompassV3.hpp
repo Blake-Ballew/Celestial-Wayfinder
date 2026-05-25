@@ -82,8 +82,7 @@ public:
         }
 
         // Init IMU
-        // if (scannedDevices.count(BMI323_ADDR))
-        if (false)
+        if (scannedDevices.count(BMI323_ADDR))
         {
             ESP_LOGI(TAG_COMPASS_V3, "Initializing BMI323...");
             _imuType = ImuV3Type::BMI323;
@@ -147,6 +146,8 @@ public:
 
     void BeginCalibration() override
     {
+        _IsCalibrated = false;
+
         _xMin = 1000000000;
         _xMax = -1000000000;
 
@@ -190,7 +191,7 @@ public:
 
         doc["magMoniker"] = _GetMagMoniker();
     }
-    
+    // I (1793) COMPASS_V3: Calibration loaded: X[-38.63,60.37] Y[-3.16,105.16] Z[-76.06,43.47]
     void SetCalibrationData(JsonDocument &doc) override
     {
         if (!doc.containsKey("xMin") || !doc.containsKey("xMax") ||
@@ -203,7 +204,7 @@ public:
         
         if ((doc["magMoniker"] | "notfound") == _GetMagMoniker())
         {
-            ESP_LOGI(TAG, "Calibration data for Mag %s found.", _GetMagMoniker().c_str());
+            ESP_LOGI(TAG_COMPASS_V3, "Calibration data for Mag %s found.", _GetMagMoniker().c_str());
             _xMin = doc["xMin"].as<float>();
             _xMax = doc["xMax"].as<float>();
 

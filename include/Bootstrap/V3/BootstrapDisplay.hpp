@@ -129,6 +129,8 @@ public:
             cmd.draw(drawCtx);
         });
 
+        displayCommandQueue = DisplayModule::Utilities::getDisplayCommandQueue();
+
         // Initialize UI
         CompassUtils::InitializeHomeWindow();
     }

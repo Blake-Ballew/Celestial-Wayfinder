@@ -21,6 +21,9 @@ class BootstrapMicrocontroller
 {
 public:
 
+    constexpr static uint8_t CPU_CORE_LORA = 1;
+    constexpr static uint8_t CPU_CORE_APP = 0;
+
     static void Initialize()
     {
         ESP_LOGI("BootstrapMicro", "Initializing IO...");

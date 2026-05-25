@@ -117,6 +117,8 @@ public:
     // Calibration methods
     void BeginCalibration()
     {
+        _IsCalibrated = false;
+
         _xMin = 1000000000;
         _xMax = -1000000000;
 
@@ -161,14 +163,36 @@ public:
 
     void SetCalibrationData(JsonDocument &doc)
     {
-        _xMin = doc["xMin"].as<float>();
-        _xMax = doc["xMax"].as<float>();
+        if (!doc.containsKey("xMin") || !doc.containsKey("xMax") ||
+            !doc.containsKey("yMin") || !doc.containsKey("yMax") ||
+            !doc.containsKey("zMin") || !doc.containsKey("zMax"))
+        {
+            ESP_LOGW(TAG_COMPASS_LSM, "SetCalibrationData: missing keys, ignoring");
+            return;
+        }
 
-        _yMin = doc["yMin"].as<float>();
-        _yMax = doc["yMax"].as<float>();
+        float xMin = doc["xMin"].as<float>();
+        float xMax = doc["xMax"].as<float>();
+        float yMin = doc["yMin"].as<float>();
+        float yMax = doc["yMax"].as<float>();
+        float zMin = doc["zMin"].as<float>();
+        float zMax = doc["zMax"].as<float>();
 
-        _zMin = doc["zMin"].as<float>();
-        _zMax = doc["zMax"].as<float>();
+        if (xMin == 0 && xMax == 0 && yMin == 0 && yMax == 0 && zMin == 0 && zMax == 0)
+        {
+            ESP_LOGW(TAG_COMPASS_LSM, "SetCalibrationData: all values are zero, ignoring");
+            return;
+        }
+
+        _xMin = xMin;
+        _xMax = xMax;
+        _yMin = yMin;
+        _yMax = yMax;
+        _zMin = zMin;
+        _zMax = zMax;
+
+        ESP_LOGI(TAG_COMPASS_LSM, "Calibration loaded: X[%.2f,%.2f] Y[%.2f,%.2f] Z[%.2f,%.2f]",
+            _xMin, _xMax, _yMin, _yMax, _zMin, _zMax);
 
         _IsCalibrated = true;
     }

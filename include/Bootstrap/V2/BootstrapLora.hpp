@@ -38,6 +38,11 @@ public:
         // Register the DIO0 ISR callback — StartReceiving() is deferred to RadioTask()
         // so the radio does not enter RX mode until the task handle is set.
         Driver().RegisterOnReceive(LoRaReceiveISR);
+
+        System_Utils::registerTask(BootstrapLora::RadioTaskRunner,    "radio-task",      4096, nullptr, 3, BootstrapMicrocontroller::CPU_CORE_LORA);
+        System_Utils::registerTask(BootstrapLora::SendQueueTaskRunner,"send-queue-task", 4096, nullptr, 2, BootstrapMicrocontroller::CPU_CORE_LORA);
+    
+        LoraModule::Utilities::MessageTypeReceived(PingMessage::GUID) += CompassUtils::PassMessageReceivedToDisplay;
     }
 
     static ArduinoLoRaDriver& Driver()

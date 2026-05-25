@@ -561,9 +561,13 @@ namespace DisplayModule
             menuItems.push_back(DisplayModule::MenuItem("Toggle Silent Mode", []()
             {
                 System_Utils::silentMode = !System_Utils::silentMode;
-                auto setting = std::static_pointer_cast<FilesystemModule::BoolSetting>(FilesystemModule::Utilities::DeviceSettings()["Silent Mode"]);
-                setting->value = System_Utils::silentMode;
-                setting->saveToPreferences(FilesystemModule::Utilities::SettingsPreference());
+                auto raw = FilesystemModule::Utilities::FindSetting("Silent Mode");
+                if (raw)
+                {
+                    auto setting = std::static_pointer_cast<FilesystemModule::BoolSetting>(raw);
+                    setting->value = System_Utils::silentMode;
+                    setting->saveToPreferences(FilesystemModule::Utilities::SettingsPreference());
+                }
             }));
             
         }

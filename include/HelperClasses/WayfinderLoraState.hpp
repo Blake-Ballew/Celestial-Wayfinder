@@ -30,23 +30,10 @@ public:
         LoadFromFlash();
         SavedMessageListUpdated() += SaveToFlash;
 
-        // Reset echo count whenever the user sends a new broadcast
-        LoraModule::Utilities::MyLastBroadcastChanged() += []() { EchoCount() = 0; };
-
         // Subscribe to PingMessage events from the LoRa core
         LoraModule::Utilities::MessageTypeReceived(PingMessage::GUID) +=
             [](std::shared_ptr<LoraModule::LoraMessageInterface> msg, bool isNew)
             {
-                // Echo detection — our broadcast bounced back from a relay node
-                auto lastBroadcast = LoraModule::Utilities::MyLastBroadcast();
-                if (lastBroadcast
-                    && msg->msgID  == lastBroadcast->msgID
-                    && msg->sender != LoraModule::Utilities::UserID())
-                {
-                    EchoCount()++;
-                    return;  // an echo is not a new unread message
-                }
-
                 auto ping = std::static_pointer_cast<PingMessage>(msg);
                 if (!ping) { return; }
 
@@ -130,12 +117,6 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    // Echo count — number of relay nodes that forwarded the current broadcast back
-    // -------------------------------------------------------------------------
-
-    static uint32_t GetEchoCount() { return EchoCount(); }
-    static void     ResetEchoCount() { EchoCount() = 0; }
-
     // -------------------------------------------------------------------------
     // Saved status message list
     // -------------------------------------------------------------------------
@@ -331,11 +312,6 @@ private:
         return m;
     }
 
-    static uint32_t& EchoCount()
-    {
-        static uint32_t n = 0;
-        return n;
-    }
 
     static SemaphoreHandle_t& MessageMutex()
     {

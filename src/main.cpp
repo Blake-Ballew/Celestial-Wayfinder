@@ -51,12 +51,6 @@ extern "C"
 #include "bootloader_random.h"
 }
 
-namespace
-{
-  const uint8_t CPU_CORE_LORA = 1;
-  const uint8_t CPU_CORE_APP = 0;
-}
-
 void enableInterruptsHandler();
 void disableInterruptsHandler();
 void enterUselessLoop();
@@ -76,18 +70,10 @@ void setup()
 
   System_Utils::init();
 
-  displayCommandQueue = DisplayModule::Utilities::getDisplayCommandQueue();
-
-  CompassUtils::InitializeDisplayManager();
-
-  ESP_LOGI(TAG, "Registering radio tasks");
-  System_Utils::registerTask(BootstrapLora::RadioTaskRunner,    "radio-task",      4096, nullptr, 3, CPU_CORE_LORA);
-  System_Utils::registerTask(BootstrapLora::SendQueueTaskRunner,"send-queue-task", 4096, nullptr, 2, CPU_CORE_LORA);
-
   LoraModule::Utilities::MessageTypeReceived(PingMessage::GUID) += CompassUtils::PassMessageReceivedToDisplay;
 
   // Initialize RPC
-  CompassUtils::InitializeRpc(1, CPU_CORE_LORA);
+  CompassUtils::InitializeRpc(1, BootstrapMicrocontroller::CPU_CORE_LORA);
 
   CompassUtils::WireFunctions();
 
