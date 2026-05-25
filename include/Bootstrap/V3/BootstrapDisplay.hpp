@@ -200,7 +200,7 @@ private:
         }
 
         // Worst case: SSD1327 128x128 @ 4bpp = 8192 bytes → ~10924 b64 chars.
-        unsigned char contents[12000];
+        unsigned char contents[3000];
         size_t b64_len = 0;
         auto res = mbedtls_base64_encode(contents, sizeof(contents), &b64_len, displayBuffer, bufferLength);
         ESP_LOGI(TAG, "Encoded buffer of size %d into %d b64 bytes (res=%d)", bufferLength, b64_len, res);
