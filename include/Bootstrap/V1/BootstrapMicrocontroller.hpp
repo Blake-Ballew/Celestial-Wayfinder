@@ -12,8 +12,6 @@
 #define SCL_PIN 22
 
 #define BUZZER_PIN 4
-#define BATT_SENSE_PIN 39
-#define KEEP_ALIVE_PIN 5
 
 class BootstrapMicrocontroller
 {
@@ -21,6 +19,9 @@ public:
 
     constexpr static uint8_t CPU_CORE_LORA = 1;
     constexpr static uint8_t CPU_CORE_APP = 0;
+
+    constexpr static uint8_t BATT_SENSE_PIN = 39;
+    constexpr static uint8_t KEEP_ALIVE_PIN = 5;
 
     static void Initialize()
     {
@@ -58,6 +59,10 @@ public:
         }
 
         ScannedDevices() = CompassUtils::ScanI2cAddresses(I2cBus());
+
+        auto healthTimerID = System_Utils::registerTimer("System Health Monitor", 60000, _MonitorSystemHealth, _HealthTimerBuffer());
+        System_Utils::startTimer(healthTimerID);
+        _MonitorSystemHealth(nullptr);
     }
 
     static TwoWire &I2cBus()
@@ -84,5 +89,25 @@ public:
     }
 
 private:
+    // TODO: BATERY CURVES
+    static void _MonitorSystemHealth(TimerHandle_t _)
+    {
+        uint16_t voltage = analogRead(BATT_SENSE_PIN);
 
+        if (voltage < 1750)
+        {
+            // Battery is low. Shut down.
+
+            // Show message and flash leds before turning off
+            auto KEEP_ALIVE_PIN = 5;
+
+            digitalWrite(KEEP_ALIVE_PIN, LOW);
+        }
+    }
+
+    static StaticTimer_t &_HealthTimerBuffer()
+    {
+        static StaticTimer_t healthTimerBuffer;
+        return healthTimerBuffer;
+    }
 };

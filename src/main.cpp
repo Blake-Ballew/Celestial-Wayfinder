@@ -68,8 +68,6 @@ void setup()
   
   vTaskDelay(300);
 
-  System_Utils::init();
-
   // Initialize RPC
   CompassUtils::InitializeRpc(1, BootstrapMicrocontroller::CPU_CORE_LORA);
 
