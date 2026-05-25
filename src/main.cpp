@@ -70,8 +70,6 @@ void setup()
 
   System_Utils::init();
 
-  LoraModule::Utilities::MessageTypeReceived(PingMessage::GUID) += CompassUtils::PassMessageReceivedToDisplay;
-
   // Initialize RPC
   CompassUtils::InitializeRpc(1, BootstrapMicrocontroller::CPU_CORE_LORA);
 
