@@ -331,7 +331,6 @@ public:
         // System
         RpcModule::Utilities::RegisterRpc("RestartSystem", [](JsonDocument &_) { ESP.restart();  vTaskDelay(1000 / portTICK_PERIOD_MS); });
         RpcModule::Utilities::RegisterRpc("GetSystemInfo", System_Utils::GetSystemInfoRpc);
-        RpcModule::Utilities::RegisterRpc("GetDisplayContents", GetDisplayContentsRpc);
     }
 
     static void ClearLocations(uint8_t inputID)
@@ -342,25 +341,6 @@ public:
     static void ClearMessages(uint8_t inputID)
     {
         WayfinderLoraState::ClearSavedMessages();
-    }
-
-    static void GetDisplayContentsRpc(JsonDocument &doc)
-    {
-        doc["width"] = display.width();
-        doc["height"] = display.height();
-
-        size_t bufferLength = (display.width() * display.height()) / 8;
-        uint8_t* displayBuffer = display.getBuffer();
-
-        // 128x128 resolution = 2048 bytes, b64 encoded = 2730 chars
-        unsigned char contents[3000];
-        size_t b64_len = 0;
-        auto res = mbedtls_base64_encode(contents, sizeof(contents), &b64_len, displayBuffer, bufferLength);
-        ESP_LOGI(TAG, "Encoded buffer of size %d into %d b64 bytes (res=%d)", bufferLength, b64_len, res);
-
-        if (res == 0) {
-            doc["buffer"] = String(contents, b64_len);
-        }
     }
 
     // Display Module

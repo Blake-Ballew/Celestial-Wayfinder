@@ -131,6 +131,8 @@ public:
 
         // Initialize UI
         CompassUtils::InitializeHomeWindow();
+
+        RpcModule::Utilities::RegisterRpc("GetDisplayContents", _GetDisplayContentsRpc);
     }
 
     // Display Drivers
@@ -163,4 +165,42 @@ public:
 
 private:
 
+    static void _GetDisplayContentsRpc(JsonDocument &doc)
+    {
+        auto* gfx = DisplayDriver().get();
+
+        doc["width"] = gfx->width();
+        doc["height"] = gfx->height();
+
+        // Cast to the concrete type to access getBuffer() — not present on Adafruit_GFX.
+        uint8_t* displayBuffer = nullptr;
+        if (gfx == static_cast<Adafruit_GFX*>(&OledDisplay()))
+        {
+            displayBuffer = OledDisplay().getBuffer();
+        }
+        else
+        {
+            displayBuffer = VirtualDisplay().getBuffer();
+        }
+
+        if (!displayBuffer)
+        {
+            ESP_LOGE(TAG, "GetDisplayContents: could not obtain display buffer");
+            return;
+        }
+
+        // SSD1306 / GFXcanvas1 are both 1bpp
+        size_t bufferLength = (gfx->width() * gfx->height()) / 8;
+
+        // V1: 128x32 = 512 bytes → ~684 b64 chars; 3000 is sufficient.
+        unsigned char contents[3000];
+        size_t b64_len = 0;
+        auto res = mbedtls_base64_encode(contents, sizeof(contents), &b64_len, displayBuffer, bufferLength);
+        ESP_LOGI(TAG, "Encoded buffer of size %d into %d b64 bytes (res=%d)", bufferLength, b64_len, res);
+
+        if (res == 0)
+        {
+            doc["buffer"] = String(contents, b64_len);
+        }
+    }
 };
