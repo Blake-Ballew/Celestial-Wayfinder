@@ -204,16 +204,16 @@ namespace DisplayModule
 
             // --- Status bar ---
             d->setTextSize(1);
-            d->setTextColor(WHITE);
+            d->setTextColor(DrawCommand::DrawColorPrimary());
             d->setCursor(2, 1);
             d->print("SC:");
             d->print(_score);
 
             // Lives as small filled squares on the right
             for (int i = 0; i < _lives && i < 5; ++i)
-                d->fillRect(W - 4 - i * 5, 2, 3, 3, WHITE);
+                d->fillRect(W - 4 - i * 5, 2, 3, 3, DrawCommand::DrawColorPrimary());
 
-            d->drawFastHLine(0, STATUS_H - 1, W, WHITE);
+            d->drawFastHLine(0, STATUS_H - 1, W, DrawCommand::DrawColorPrimary());
 
             // --- Game Over / Win overlay ---
             if (_over)
@@ -247,15 +247,15 @@ namespace DisplayModule
                     if (!_bricks[r][c]) continue;
                     int bx = BRICK_LEFT + c * (BRICK_W + BRICK_GAP_X);
                     int by = BRICK_TOP  + r * (BRICK_H + BRICK_GAP_Y);
-                    d->fillRect(bx, by, BRICK_W, BRICK_H, WHITE);
+                    d->fillRect(bx, by, BRICK_W, BRICK_H, DrawCommand::DrawColorPrimary());
                 }
             }
 
             // --- Paddle ---
-            d->fillRect(_paddleX, PADDLE_Y, PADDLE_W, PADDLE_H, WHITE);
+            d->fillRect(_paddleX, PADDLE_Y, PADDLE_W, PADDLE_H, DrawCommand::DrawColorPrimary());
 
             // --- Ball ---
-            d->fillRect((int)_ballX, (int)_ballY, BALL_SZ, BALL_SZ, WHITE);
+            d->fillRect((int)_ballX, (int)_ballY, BALL_SZ, BALL_SZ, DrawCommand::DrawColorPrimary());
         }
     };
 
