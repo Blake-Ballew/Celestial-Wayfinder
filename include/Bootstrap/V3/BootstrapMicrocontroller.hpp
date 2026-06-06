@@ -7,6 +7,8 @@
 #include "EventDeclarations.h"
 #include "CompassUtils.h"
 #include "globalDefines.h"
+#include "System_Utils.h"
+#include <BQ25672.h>
 
 #define BUZZER_PIN 7
 
@@ -63,6 +65,34 @@ public:
         ESP_LOGI("BootstrapMicro", "Scanning I2C addresses...");
         ScannedDevices() = CompassUtils::ScanI2cAddresses(I2cBus());
         ESP_LOGI("BootstrapMicro", "Found %d I2C devices", ScannedDevices().size());
+
+        ESP_LOGI("BootstrapMicro", "Initializing BQ25672 PMIC...");
+        auto pmicErr = Charger().begin();
+        if (pmicErr != BQ25672::Error::OK)
+        {
+            ESP_LOGW(TAG, "BQ25672 init failed (err %d)", static_cast<int>(pmicErr));
+        }
+        else
+        {
+            ESP_LOGI(TAG, "BQ25672 initialized");
+        }
+
+        System_Utils::registerBatteryCallback([]() -> long {
+            uint16_t mv;
+            if (!Charger().readVbat_mV(mv))
+            {
+                ESP_LOGW(TAG, "BQ25672 battery read failed");
+                return 0;
+            }
+            if (mv >= 4200) return 100;
+            if (mv >= 4100) return 90 + (long)(mv - 4100) * 10 / 100;
+            if (mv >= 3950) return 75 + (long)(mv - 3950) * 15 / 150;
+            if (mv >= 3800) return 50 + (long)(mv - 3800) * 25 / 150;
+            if (mv >= 3650) return 25 + (long)(mv - 3650) * 25 / 150;
+            if (mv >= 3500) return 10 + (long)(mv - 3500) * 15 / 150;
+            if (mv >= 3200) return      (long)(mv - 3200) * 10 / 300;
+            return 0;
+        });
     }
 
     static TwoWire &I2cBus()
@@ -89,5 +119,9 @@ public:
     }
 
 private:
-
+    static BQ25672 &Charger()
+    {
+        static BQ25672 charger(I2cBus());
+        return charger;
+    }
 };

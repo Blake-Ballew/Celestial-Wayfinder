@@ -7,6 +7,7 @@
 #include "EventDeclarations.h"
 #include "CompassUtils.h"
 #include "globalDefines.h"
+#include "System_Utils.h"
 
 #define BUZZER_PIN 4
 #define BATT_SENSE_PIN 39
@@ -54,6 +55,24 @@ public:
         }
 
         ScannedDevices() = CompassUtils::ScanI2cAddresses(I2cBus());
+
+        System_Utils::registerBatteryCallback([]() -> long {
+            uint32_t sum = 0;
+            for (int i = 0; i < 8; i++) {
+                sum += analogReadMilliVolts(BATT_SENSE_PIN);
+                delayMicroseconds(100);
+            }
+            uint16_t mv = (uint16_t)(sum / 8);
+            if (mv == 0)    return 100; // USB powered
+            if (mv >= 2100) return 100;
+            if (mv >= 2050) return 90 + (long)(mv - 2050) * 10 / 50;
+            if (mv >= 1975) return 75 + (long)(mv - 1975) * 15 / 75;
+            if (mv >= 1900) return 50 + (long)(mv - 1900) * 25 / 75;
+            if (mv >= 1825) return 25 + (long)(mv - 1825) * 25 / 75;
+            if (mv >= 1750) return 10 + (long)(mv - 1750) * 15 / 75;
+            if (mv >= 1600) return      (long)(mv - 1600) * 10 / 150;
+            return 0;
+        });
     }
 
     static TwoWire &I2cBus()
