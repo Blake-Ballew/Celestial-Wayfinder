@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <Arduino.h> // millis()
 #include "Window.hpp"
 #include "WindowState.hpp"
 #include "DisplayUtilities.hpp"
@@ -48,19 +49,35 @@ namespace DisplayModule
 
         static constexpr int TOTAL_BRICKS = BRICK_ROWS * BRICK_COLS;
 
+        // Render cadence: how often the frame is redrawn (40 FPS).
+        static constexpr uint32_t FRAME_MS = 25;
+        // Physics cadence: how often the simulation advances one step. The ball
+        // velocities are tuned per-step, so this fixes the ball's real speed
+        // independent of FRAME_MS.
+        static constexpr uint32_t STEP_MS  = 25;
+        // Cap on catch-up steps in a single update so a long stall can't make
+        // the simulation spiral trying to replay a huge backlog.
+        static constexpr int MAX_STEPS = 4;
+
         BreakoutGameState()
         {
-            refreshIntervalMs = 50; // 20 FPS
+            refreshIntervalMs = FRAME_MS;
 
             // Bindings live in the constructor so they are registered exactly once.
+            // Each paddle move also advances the simulation: a stream of encoder
+            // inputs keeps the queue busy so the autonomous refresh timeout (which
+            // drives onTick) never fires — without this the ball would freeze for
+            // as long as the paddle is moving.
             bindInput(InputID::ENC_UP, [this](const InputContext &)
             {
                 _paddleX = std::min(_paddleX + PADDLE_STEP, W - PADDLE_W);
+                _stepPhysics();
             });
 
             bindInput(InputID::ENC_DOWN, [this](const InputContext &)
             {
                 _paddleX = std::max(_paddleX - PADDLE_STEP, 0);
+                _stepPhysics();
             });
 
             bindInput(InputID::BUTTON_4, "Restart", [this](const InputContext &)
@@ -80,41 +97,71 @@ namespace DisplayModule
 
         void onTick() override
         {
-            if (!_over && !_won)
-                _update();
+            _stepPhysics();
         }
 
     private:
-        int   _paddleX    = (W - PADDLE_W) / 2;
-        float _ballX      = W / 2.0f;
-        float _ballY      = PADDLE_Y - BALL_SZ - 2.0f;
-        float _velX       = 2.0f;
-        float _velY       = -2.5f;
-        int   _score      = 0;
-        int   _lives      = 3;
-        bool  _over       = false;
-        bool  _won        = false;
-        bool  _bricks[BRICK_ROWS][BRICK_COLS];
-        int   _bricksLeft = TOTAL_BRICKS;
+        int      _paddleX    = (W - PADDLE_W) / 2;
+        float    _ballX      = W / 2.0f;
+        float    _ballY      = PADDLE_Y - BALL_SZ - 2.0f;
+        float    _velX       = 1.0f;
+        float    _velY       = -1.25f;
+        int      _score      = 0;
+        int      _lives      = 3;
+        bool     _over       = false;
+        bool     _won        = false;
+        bool     _bricks[BRICK_ROWS][BRICK_COLS];
+        int      _bricksLeft = TOTAL_BRICKS;
+        uint32_t _lastStepMs = 0; // wall clock of the last advanced physics step
 
         void _resetGame()
         {
             _paddleX    = (W - PADDLE_W) / 2;
             _ballX      = W / 2.0f;
             _ballY      = PADDLE_Y - BALL_SZ - 2.0f;
-            _velX       = 2.0f;
-            _velY       = -2.5f;
+            _velX       = 1.0f;
+            _velY       = -1.25f;
             _score      = 0;
             _lives      = 3;
             _over       = false;
             _won        = false;
             _bricksLeft = TOTAL_BRICKS;
+            _lastStepMs = millis();
             for (int r = 0; r < BRICK_ROWS; ++r)
                 for (int c = 0; c < BRICK_COLS; ++c)
                     _bricks[r][c] = true;
         }
 
         static float _fabs(float v) { return v < 0 ? -v : v; }
+
+        // Advance the simulation on a fixed STEP_MS timestep using real elapsed
+        // time. Called both from onTick() (autonomous refresh) and from the
+        // paddle input handlers, so the ball keeps moving at a constant speed
+        // regardless of the render rate or how fast inputs are arriving.
+        void _stepPhysics()
+        {
+            uint32_t now = millis();
+
+            if (_over || _won)
+            {
+                _lastStepMs = now; // no backlog to replay once play resumes
+                return;
+            }
+
+            int steps = 0;
+            while (now - _lastStepMs >= STEP_MS && steps < MAX_STEPS)
+            {
+                _update();
+                _lastStepMs += STEP_MS;
+                ++steps;
+                if (_over || _won) break;
+            }
+
+            // Dropped frames (long stall): discard the backlog instead of
+            // sprinting to catch up, which would teleport the ball.
+            if (steps >= MAX_STEPS)
+                _lastStepMs = now;
+        }
 
         void _update()
         {
@@ -139,8 +186,8 @@ namespace DisplayModule
                 _velY  = -_fabs(_velY);
                 // Vary X angle based on where ball hits paddle
                 float rel = (_ballX + BALL_SZ * 0.5f) - (_paddleX + PADDLE_W * 0.5f);
-                _velX = rel * 0.18f;
-                if (_fabs(_velX) < 0.6f) _velX = (_velX >= 0) ? 0.6f : -0.6f;
+                _velX = rel * 0.09f;
+                if (_fabs(_velX) < 0.3f) _velX = (_velX >= 0) ? 0.3f : -0.3f;
             }
 
             // Ball escapes below paddle
@@ -155,8 +202,8 @@ namespace DisplayModule
                 // Reset ball above paddle
                 _ballX = _paddleX + PADDLE_W * 0.5f - BALL_SZ * 0.5f;
                 _ballY = PADDLE_Y - BALL_SZ - 2.0f;
-                _velX  = 2.0f;
-                _velY  = -2.5f;
+                _velX  = 1.0f;
+                _velY  = -1.25f;
                 return;
             }
 
