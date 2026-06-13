@@ -569,7 +569,14 @@ namespace DisplayModule
                     setting->saveToPreferences(FilesystemModule::Utilities::SettingsPreference());
                 }
             }));
-            
+
+            if (System_Utils::getSystemShutdown().Count())
+            {
+                menuItems.push_back(DisplayModule::MenuItem("Shutdown", []()
+                {
+                    System_Utils::systemShutdownInvoke();
+                }));
+            }            
         }
     };
 

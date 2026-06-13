@@ -4,8 +4,8 @@
 #include "CompassUtils.h"
 #include "RpcUtils.h"
 
-#include "Adafruit_SSD1327.h"
 #include "Adafruit_GFX.h"
+#include "Adafruit_SH110X.h"
 
 #include "DisplayManager.hpp"
 
@@ -20,27 +20,26 @@ public:
         // Initialize Driver
         if (BootstrapMicrocontroller::ScannedDevices().count(OLED_ADDR))
         {
-            ESP_LOGI(TAG, "Initializing SSD1327...");
+            ESP_LOGI(TAG, "Initializing SH1107...");
 
-            auto result = OledDisplay().begin(OLED_ADDR);
+            auto result = OledDisplay().begin(OLED_ADDR, true);
+
+            DisplayModule::DrawCommand::DrawColorPrimary() = SH110X_WHITE;
 
             if (result)
             {
-                ESP_LOGI(TAG, "SSD1327 Initialized.");
-                OledDisplay().setRotation(2);
+                ESP_LOGI(TAG, "SH1107 Initialized.");
                 OledDisplay().clearDisplay();
                 OledDisplay().setContrast(0x7F);
-                OledDisplay().setTextColor(SSD1327_WHITE);
+                OledDisplay().setTextColor(DisplayModule::DrawCommand::DrawColorPrimary());
                 OledDisplay().display();
             }
             else
             {
-                ESP_LOGW(TAG, "SSD1327 Failed to initialize.");
+                ESP_LOGW(TAG, "SH1107 Failed to initialize.");
             }
 
             DisplayDriver() = std::shared_ptr<Adafruit_GFX>(&OledDisplay(), [](Adafruit_GFX*){});
-
-            DisplayModule::DrawCommand::DrawColorPrimary() = SSD1327_WHITE;
 
             DisplayModule::Utilities::onRenderComplete += []()
             {
@@ -152,9 +151,9 @@ public:
         return virtualDisplay;
     }
 
-    static Adafruit_SSD1327 &OledDisplay()
+    static Adafruit_SH1107 &OledDisplay()
     {
-        static Adafruit_SSD1327 oledDisplay(OLED_WIDTH, OLED_HEIGHT, &BootstrapMicrocontroller::I2cBus(), -1);
+        static Adafruit_SH1107 oledDisplay(OLED_WIDTH, OLED_HEIGHT, &BootstrapMicrocontroller::I2cBus(), BootstrapMicrocontroller::DISPLAY_RESET_PIN);
         return oledDisplay;
     }
 

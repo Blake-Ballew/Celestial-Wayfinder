@@ -61,7 +61,7 @@ void Bootstrap();
 void setup()
 {
   Serial.begin(115200);
-  vTaskDelay(pdMS_TO_TICKS(100));
+  vTaskDelay(pdMS_TO_TICKS(3000));
 
   bootloader_random_enable();
   

@@ -2,6 +2,7 @@
 
 #include "BootstrapMicrocontroller.hpp"
 #include "CompassUtils.h"
+#include "RpcUtils.h"
 
 #include "Adafruit_SSD1306.h"
 #include "Adafruit_GFX.h"
@@ -21,7 +22,7 @@ public:
         {
             ESP_LOGI(TAG, "Initializing SSD1306...");
 
-            auto result = OledDisplay().begin(OLED_ADDR);
+            auto result = OledDisplay().begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
 
             if (result)
             {

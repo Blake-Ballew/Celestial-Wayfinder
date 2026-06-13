@@ -26,6 +26,8 @@ public:
     constexpr static uint8_t CPU_CORE_LORA = 1;
     constexpr static uint8_t CPU_CORE_APP = 0;
 
+    constexpr static uint8_t DISPLAY_RESET_PIN = 47;
+
     static void Initialize()
     {
         ESP_LOGI("BootstrapMicro", "Initializing IO...");
@@ -40,6 +42,12 @@ public:
         // TODO: Add encoder button
 
         pinMode(BUZZER_PIN, OUTPUT);
+
+        pinMode(DISPLAY_RESET_PIN, OUTPUT);
+        digitalWrite(DISPLAY_RESET_PIN, LOW);
+        delay(100);
+        digitalWrite(DISPLAY_RESET_PIN, HIGH);
+        delay(100);
 
         ESP_LOGI("BootstrapMicro", "Configuring encoder...");
         Encoder().attachFullQuad(ENC_A, ENC_B);
@@ -75,7 +83,14 @@ public:
         else
         {
             ESP_LOGI(TAG, "BQ25672 initialized");
+            Charger().setShipFetPresent(true);
         }
+
+        System_Utils::getSystemShutdown() += []()
+        {
+            Charger().setSdrvDelayNo10s(true);
+            Charger().setSdrvControl(BQ25672::SdrvCtrl::ShipMode);
+        };
 
         System_Utils::registerBatteryCallback([]() -> long {
             uint16_t mv;

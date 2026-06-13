@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef USE_V3_OLED
-#include "Adafruit_SSD1327.h"
-#endif
-
 #include <FastLED.h>
 
 #include "LoraManager.hpp"
@@ -46,22 +42,11 @@ static const char *TAG_COMPASS = "COMPASS";
 namespace
 {
     static RpcModule::Manager RpcManagerInstance;
-    static DisplayModule::Manager DisplayManagerInstance;
     static ConnectivityModule::EspNowManager EspNowManagerInstance;
     FilesystemModule::Manager filesystemManagerInstance;
     static AsyncWebServer WebServerInstance(80);
     static AsyncCorsMiddleware cors;
     static std::shared_ptr<DisplayModule::HomeWindow> _homeWindowInstance;
-
-    #if HARDWARE_VERSION < 3
-    Adafruit_SSD1306 display = Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire);
-    #elif HARDWARE_VERSION == 3
-    #ifdef USE_V3_OLED   
-    Adafruit_SSD1327 display = Adafruit_SSD1327(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
-    #else
-    GFXcanvas1 display = GFXcanvas1(OLED_WIDTH, OLED_HEIGHT);
-    #endif
-    #endif
 }
 
 // Static class to help interface with esp32 utils compass functionality
@@ -116,6 +101,7 @@ public:
         FilesystemModule::Utilities::SettingsUpdated() += ConnectivityModule::Utilities::ProcessSettings;
         FilesystemModule::Utilities::SettingsUpdated() += System_Utils::UpdateSettings;
         FilesystemModule::Utilities::SettingsUpdated() += Bluetooth_Utils::SettingsUpdated;
+        FilesystemModule::Utilities::SettingsUpdated() += LoraModule::Utilities::UpdateSettings;
 
         FilesystemModule::Utilities::RequestSettingsRefresh() += []()
         {
@@ -180,16 +166,10 @@ public:
         settings.push_back(themeGreen);
 
         auto themeBlue = std::make_shared<FilesystemModule::IntSetting>("Theme Color Blue", 0, 0, 255, 1);
-        settings.push_back(themeBlue);
-
-        // TODO: dumb this down to walkie-talkie style channels
-        auto frequency = std::make_shared<FilesystemModule::FloatSetting>("Frequency", 914.9, 902.3, 914.9, 0.2);
-        settings.push_back(frequency);
-
-        auto broadcastAttempts = std::make_shared<FilesystemModule::IntSetting>("Num Broadcasts", 3, 1, 5, 1);
-        settings.push_back(broadcastAttempts);
+        settings.push_back(themeBlue);        
 
         System_Utils::GenerateDefaultSettings(settings);
+        LoraModule::Utilities::GenerateDefaultSettings(settings);
 
         std::vector<std::string> wifiOptions = {"Off", "AP Mode", "Station Mode"};
         std::vector<int> wifiValues = {0, 1, 2};
@@ -250,10 +230,6 @@ public:
             LED_Utils::setThemeColor(color);
             auto interfaceColor = LedPatternInterface::ThemeColor();
             ESP_LOGI(TAG_COMPASS, "LED Interface::ThemeColor: %d, %d, %d", interfaceColor.r, interfaceColor.g, interfaceColor.b);
-
-            // Lora Module
-            LoraUtils::UserName()            = doc["User Name"].as<std::string>();
-            LoraUtils::DefaultSendAttempts() = doc["Num Broadcasts"] | (uint8_t)3;
 
             ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
         }
@@ -416,6 +392,14 @@ public:
             ESP.restart();
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }));
+
+        if (System_Utils::getSystemShutdown().Count())
+        {
+            menuItems.push_back(DisplayModule::MenuItem("Shutdown", []()
+            {
+                System_Utils::systemShutdownInvoke();
+            }));
+        }
 
         auto mainMenuWindowPtr = DisplayModule::makeMenuWindow(menuItems);
 

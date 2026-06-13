@@ -21,7 +21,7 @@ public:
         {
             ESP_LOGI(TAG, "Initializing SSD1306...");
 
-            auto result = OledDisplay().begin(OLED_ADDR);
+            auto result = OledDisplay().begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
 
             if (result)
             {
