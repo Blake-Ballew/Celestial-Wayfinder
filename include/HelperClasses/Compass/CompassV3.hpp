@@ -82,12 +82,11 @@ public:
         }
 
         // Init IMU
-        // if (scannedDevices.count(BMI323_ADDR))
-        if (false)
+        if (scannedDevices.count(BMI323_ADDR))
         {
             ESP_LOGI(TAG_COMPASS_V3, "Initializing BMI323...");
             _imuType = ImuV3Type::BMI323;
-            if (!_imuBMI323.beginI2C(BMI323_ADDR))
+            if (!_imuBMI323.beginI2C(BMI323_ADDR, i2cBus))
             {
                 ESP_LOGE(TAG_COMPASS_V3, "ERROR: BMI323 failed to initialize!");
                 _imuType = ImuV3Type::NONE;
@@ -112,6 +111,8 @@ public:
         {
             ESP_LOGE(TAG_COMPASS_V3, "No IMUs were found in the I2C scan!");
         }
+
+        _SetDefaultCalibration();
 
         ESP_LOGI(TAG_COMPASS_V3, "CompassV3 Initialized with mag: %s and accel: %s", _GetMagMoniker().c_str(), _GetAccelMoniker().c_str());
     }
@@ -147,6 +148,8 @@ public:
 
     void BeginCalibration() override
     {
+        _IsCalibrated = false;
+
         _xMin = 1000000000;
         _xMax = -1000000000;
 
@@ -190,7 +193,7 @@ public:
 
         doc["magMoniker"] = _GetMagMoniker();
     }
-    
+    // I (1793) COMPASS_V3: Calibration loaded: X[-38.63,60.37] Y[-3.16,105.16] Z[-76.06,43.47]
     void SetCalibrationData(JsonDocument &doc) override
     {
         if (!doc.containsKey("xMin") || !doc.containsKey("xMax") ||
@@ -203,7 +206,7 @@ public:
         
         if ((doc["magMoniker"] | "notfound") == _GetMagMoniker())
         {
-            ESP_LOGI(TAG, "Calibration data for Mag %s found.", _GetMagMoniker().c_str());
+            ESP_LOGI(TAG_COMPASS_V3, "Calibration data for Mag %s found.", _GetMagMoniker().c_str());
             _xMin = doc["xMin"].as<float>();
             _xMax = doc["xMax"].as<float>();
 
@@ -313,6 +316,28 @@ private:
         }
 
         return true;
+    }
+
+    void _SetDefaultCalibration()
+    {
+        if (_magType == MagnetometerV3Type::MMC5603)
+        {
+            _xMin = -27.78f;
+            _xMax = 66.00f;
+            _yMin = -114.31f;
+            _yMax = -12.05f;
+            _zMin = -66.80f;
+            _zMax = 33.04f;
+        }
+        else if (_magType == MagnetometerV3Type::BMM350)
+        {
+            _xMin = -52.57f;
+            _xMax = 43.67f;
+            _yMin = -28.63f;
+            _yMax = 74.38f;
+            _zMin = -98.16f;
+            _zMax = -0.71f;
+        }
     }
 
     void _AdjustMagReading(float &x, float &y, float &z)

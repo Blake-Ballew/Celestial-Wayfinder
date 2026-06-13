@@ -65,9 +65,9 @@ namespace DisplayModule
         void onTick()
         {
             NavigationUtils::PrintRawValues(); // logs to serial/ESP_LOG
-            auto heading = NavigationUtils::GetAzimuth();
-            _bearing = 360.0f - heading;
-            ESP_LOGD(TAG, "Current heading: %d Current bearing: %d", heading, static_cast<int>(_bearing));
+            _heading = NavigationUtils::GetAzimuth();
+            _bearing = NavigationUtils::GetBearing();
+            ESP_LOGI(TAG, "Current heading: %d Current bearing to north: %d", static_cast<int>(_heading), static_cast<int>(_bearing));
             _rebuildDrawCommands();
             _configureLeds();
         }
@@ -78,18 +78,27 @@ namespace DisplayModule
 
     private:
         float _bearing = 0.0f;
+        float _heading = 0.0f;
         int _ringPointPatternId = -1;
 
         void _rebuildDrawCommands()
         {
             clearDrawCommands();
 
-            char buf[24];
-            snprintf(buf, sizeof(buf), "North: %.1f", static_cast<double>(_bearing));
+            std::string northStr = "North: " + std::to_string(_bearing);
+
+            auto displayLine = Utilities::selectBottomTextLine() >> 1;
 
             addDrawCommand(std::make_shared<TextDrawCommand>(
-                std::string(buf),
-                TextFormat{ TextAlignH::CENTER, TextAlignV::CENTER }
+                northStr,
+                TextFormat{ TextAlignH::CENTER, TextAlignV::LINE, static_cast<uint8_t>(displayLine) }
+            ));
+
+            std::string headingStr = "Heading: " + std::to_string(static_cast<int>(_heading));
+            displayLine++;
+            addDrawCommand(std::make_shared<TextDrawCommand>(
+                headingStr,
+                TextFormat{ TextAlignH::CENTER, TextAlignV::LINE, static_cast<uint8_t>(displayLine) }
             ));
         }
 

@@ -1,4 +1,5 @@
 #include "EventDeclarations.h"
+#include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
 #include "globalDefines.h"
 #include "LED_Manager.h"
 #include "Display_Manager.h"
@@ -116,60 +117,107 @@ void IRAM_ATTR button4ISR()
 //     }
 // }
 
+#if HARDWARE_VERSION == 1
+
 void IRAM_ATTR enc_cb(void *arg)
 {
     static int64_t prevCount = 0;
+    static TickType_t lastISRTime = 0;
+
     ESP32Encoder *enc = ESP32Encoder::encoders[0];
-    /*    if (enc == NULL)
-        {
-    #if DEBUG == 1
-            ESP_EARLY_LOGE(TAG, "enc_cb: enc is NULL");
-    #endif
-            return;
-        }
-    */
     int64_t currCount = enc->getCount();
-    if (currCount % 2 == 0)
+
+    if (currCount % 2 != 0) { return; }
+
+    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_ENC) { return; }
+    lastISRTime = xTaskGetTickCount();
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    DisplayModule::DisplayCommandQueueItem command;
+    command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
+
+    if (currCount > prevCount)
     {
-        static TickType_t lastISRTime = 0;
-        if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_ENC)
-        {
-            return;
-        }
-
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        DisplayModule::DisplayCommandQueueItem command;
-        command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
-        if (currCount > prevCount)
-        {
-#if HARDWARE_VERSION == 1
-            command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
-#else
-            command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
-#endif
-        }
-        else if (currCount < prevCount)
-        {
-#if HARDWARE_VERSION == 1
-            command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
-#else
-            command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
-#endif
-        }
-        else
-        {
-            return;
-        }
-        prevCount = currCount;
-
-        xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
-
-        if (xHigherPriorityTaskWoken)
-        {
-            portYIELD_FROM_ISR();
-        }
+        command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
     }
+    else if (currCount < prevCount)
+    {
+        command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
+    }
+    else { return; }
+
+    prevCount = currCount;
+    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) { portYIELD_FROM_ISR(); }
 }
+
+#elif HARDWARE_VERSION == 2
+
+void IRAM_ATTR enc_cb(void *arg)
+{
+    static int64_t prevCount = 0;
+    static TickType_t lastISRTime = 0;
+
+    ESP32Encoder *enc = ESP32Encoder::encoders[0];
+    int64_t currCount = enc->getCount();
+
+    if (currCount % 2 != 0) { return; }
+
+    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_ENC) { return; }
+    lastISRTime = xTaskGetTickCount();
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    DisplayModule::DisplayCommandQueueItem command;
+    command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
+
+    if (currCount > prevCount)
+    {
+        command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
+    }
+    else if (currCount < prevCount)
+    {
+        command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
+    }
+    else { return; }
+
+    prevCount = currCount;
+    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) { portYIELD_FROM_ISR(); }
+}
+
+#elif HARDWARE_VERSION == 3
+
+void IRAM_ATTR enc_cb(void *arg)
+{
+    static int64_t prevCount = 0;
+    static TickType_t lastISRTime = 0;
+
+    ESP32Encoder *enc = ESP32Encoder::encoders[0];
+    int64_t currCount = enc->getCount();
+
+    if (xTaskGetTickCount() - lastISRTime < DEBOUNCE_TIME_ENC) { return; }
+    lastISRTime = xTaskGetTickCount();
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    DisplayModule::DisplayCommandQueueItem command;
+    command.commandType = DisplayModule::CommandType::INPUT_COMMAND;
+
+    if (currCount > prevCount)
+    {
+        command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_UP;
+    }
+    else if (currCount < prevCount)
+    {
+        command.commandData.inputCommand.inputID = DisplayModule::InputID::ENC_DOWN;
+    }
+    else { return; }
+
+    prevCount = currCount;
+    xQueueSendFromISR(displayCommandQueue, &command, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) { portYIELD_FROM_ISR(); }
+}
+
+#endif
 
 void IRAM_ATTR CompassDRDYISR()
 {
@@ -177,6 +225,25 @@ void IRAM_ATTR CompassDRDYISR()
     // ESP_EARLY_LOGD(TAG, "CompassDRDYISR");
 #endif
     // Navigation_Manager::read();
+}
+
+void IRAM_ATTR LoRaReceiveISR(int packetSize)
+{
+    if (radioReadTaskHandle != nullptr)
+    {
+        BaseType_t higherPriorityTaskWoken = pdFALSE;
+        vTaskNotifyGiveFromISR(radioReadTaskHandle, &higherPriorityTaskWoken);
+        portYIELD_FROM_ISR(higherPriorityTaskWoken);
+    }
+}
+
+void IRAM_ATTR ArduinoLoRaDriver::_onCadDone(bool channelBusy)
+{
+    if (_instance == nullptr) { return; }
+    _instance->_cadResult = channelBusy;
+    BaseType_t woken = pdFALSE;
+    xSemaphoreGiveFromISR(_cadSemaphore, &woken);
+    portYIELD_FROM_ISR(woken);
 }
 
 // void enableInterrupts()

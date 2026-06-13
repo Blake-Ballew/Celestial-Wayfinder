@@ -1,15 +1,12 @@
 #pragma once
 
-#ifdef USE_V3_OLED
-#include "Adafruit_SSD1327.h"
-#endif
-
 #include <FastLED.h>
 
-#include "LoraManager.h"
+#include "LoraManager.hpp"
 #include "FilesystemUtils.h"
 #include "RpcUtils.h"
 #include "LED_Utils.h"
+#include "LED_Manager.h"
 #include "FilesystemManager.h"
 #include "EspNowManager.h"
 #include "Display_Manager.h"
@@ -18,10 +15,9 @@
 
 #include "RpcManager.h"
 #include "SettingsInterface.hpp"
-#include <map>
 #include "Bluetooth_Utils.h"
 
-#include "HelperClasses/LoRaDriver/ArduinoLoRaDriver.h"
+#include "HelperClasses/WayfinderLoraState.hpp"
 
 #include "ArduinoJson.h"
 #include "globalDefines.h"
@@ -31,10 +27,13 @@
 
 #include "HelperClasses/Window/HomeWindow.hpp"
 #include "HelperClasses/Window/CompassWindow.hpp"
+#if HARDWARE_VERSION >= 3
+    #include "HelperClasses/Window/BreakoutWindow.hpp"
+#endif
 #include "GpsWindow.hpp"
 #include "DiagnosticsWindow.hpp"
 #include "EditSavedLocationsWindow.hpp"
-#include "EditStatusMessagesWindow.hpp"
+#include "HelperClasses/Window/EditStatusMessagesWindow.hpp"
 #include "WiFiRpcWindow.hpp"
 #include "PairBluetoothWindow.hpp"
 
@@ -43,22 +42,11 @@ static const char *TAG_COMPASS = "COMPASS";
 namespace
 {
     static RpcModule::Manager RpcManagerInstance;
-    static DisplayModule::Manager DisplayManagerInstance;
     static ConnectivityModule::EspNowManager EspNowManagerInstance;
     FilesystemModule::Manager filesystemManagerInstance;
     static AsyncWebServer WebServerInstance(80);
     static AsyncCorsMiddleware cors;
     static std::shared_ptr<DisplayModule::HomeWindow> _homeWindowInstance;
-
-    #if HARDWARE_VERSION < 3
-    Adafruit_SSD1306 display = Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire);
-    #elif HARDWARE_VERSION == 3
-    #ifdef USE_V3_OLED   
-    Adafruit_SSD1327 display = Adafruit_SSD1327(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
-    #else
-    GFXcanvas1 display = GFXcanvas1(OLED_WIDTH, OLED_HEIGHT);
-    #endif
-    #endif
 }
 
 // Static class to help interface with esp32 utils compass functionality
@@ -68,9 +56,8 @@ class CompassUtils
 public:
 
     static uint8_t MessageReceivedInputID;
-    static ArduinoLoRaDriver ArduinoLora;
 
-    static void PassMessageReceivedToDisplay(uint32_t sendingUserID, bool isNew)
+    static void PassMessageReceivedToDisplay(std::shared_ptr<LoraModule::LoraMessageInterface> msg, bool isNew)
     {
         if (isNew)
         {
@@ -114,6 +101,7 @@ public:
         FilesystemModule::Utilities::SettingsUpdated() += ConnectivityModule::Utilities::ProcessSettings;
         FilesystemModule::Utilities::SettingsUpdated() += System_Utils::UpdateSettings;
         FilesystemModule::Utilities::SettingsUpdated() += Bluetooth_Utils::SettingsUpdated;
+        FilesystemModule::Utilities::SettingsUpdated() += LoraModule::Utilities::UpdateSettings;
 
         FilesystemModule::Utilities::RequestSettingsRefresh() += []()
         {
@@ -149,63 +137,51 @@ public:
         System_Utils::DeviceID = deviceInfo.getUInt("UserID");
     }
 
-    static std::map<std::string, std::shared_ptr<FilesystemModule::SettingsInterface>> GenerateSettings()
+    static std::vector<std::shared_ptr<FilesystemModule::SettingsInterface>> GenerateSettings()
     {
-        std::map<std::string, std::shared_ptr<FilesystemModule::SettingsInterface>> settings;
+        std::vector<std::shared_ptr<FilesystemModule::SettingsInterface>> settings;
 
-        std::string defaultUserName;
         std::string defaultDeviceName;
-        {
-            char usernamebuffer[10];
-            sprintf(usernamebuffer, "User_%04X", FilesystemModule::Utilities::DeviceInfo().getUInt("UserID") & 0xFFFF);
-            defaultUserName = usernamebuffer;
-        }
         {
             char devicenamebuffer[20];
             sprintf(devicenamebuffer, "Beacon_%04X", FilesystemModule::Utilities::DeviceInfo().getUInt("UserID") & 0xFFFF);
             defaultDeviceName = devicenamebuffer;
         }
-        
-        auto userName = std::make_shared<FilesystemModule::StringSetting>("User Name", defaultUserName, 12);
-        settings[userName->key] = userName;
+
+        auto userName = std::make_shared<FilesystemModule::StringSetting>("User Name", "User", 12);
+        settings.push_back(userName);
 
         auto deviceName = std::make_shared<FilesystemModule::StringSetting>("Device Name", defaultDeviceName, 20);
-        settings[deviceName->key] = deviceName;
+        settings.push_back(deviceName);
 
         std::vector<std::string> colorThemeOptions = {"Custom", "Red", "Green", "Blue", "Purple", "Yellow", "Cyan", "White", "Orange"};
         std::vector<int> colorThemeValues = {0, 1, 2, 3, 4, 5, 6, 7, 8};
         auto colorTheme = std::make_shared<FilesystemModule::EnumSetting>("Theme Color", 2, colorThemeOptions, colorThemeValues);
-        settings[colorTheme->key] = colorTheme;
+        settings.push_back(colorTheme);
 
         auto themeRed = std::make_shared<FilesystemModule::IntSetting>("Theme Color Red", 0, 0, 255, 1);
-        settings[themeRed->key] = themeRed;
+        settings.push_back(themeRed);
 
         auto themeGreen = std::make_shared<FilesystemModule::IntSetting>("Theme Color Green", 255, 0, 255, 1);
-        settings[themeGreen->key] = themeGreen;
+        settings.push_back(themeGreen);
 
         auto themeBlue = std::make_shared<FilesystemModule::IntSetting>("Theme Color Blue", 0, 0, 255, 1);
-        settings[themeBlue->key] = themeBlue;
-
-        // TODO: dumb this down to walkie-talkie style channels
-        auto frequency = std::make_shared<FilesystemModule::FloatSetting>("Frequency", 914.9, 902.3, 914.9, 0.2);
-        settings[frequency->key] = frequency;
-
-        auto broadcastAttempts = std::make_shared<FilesystemModule::IntSetting>("Num Broadcasts", 3, 1, 5, 1);
-        settings[broadcastAttempts->key] = broadcastAttempts;
+        settings.push_back(themeBlue);        
 
         System_Utils::GenerateDefaultSettings(settings);
+        LoraModule::Utilities::GenerateDefaultSettings(settings);
 
         std::vector<std::string> wifiOptions = {"Off", "AP Mode", "Station Mode"};
         std::vector<int> wifiValues = {0, 1, 2};
         auto wifiProvisioning = std::make_shared<FilesystemModule::EnumSetting>("WiFi Mode", 0, wifiOptions, wifiValues);
-        settings[wifiProvisioning->key] = wifiProvisioning;
+        settings.push_back(wifiProvisioning);
 
         auto wifiapPassword = std::make_shared<FilesystemModule::StringSetting>("WiFi AP Password", "esp-pass", 21);
-        settings[wifiapPassword->key] = wifiapPassword;
+        settings.push_back(wifiapPassword);
 
         for (const auto& setting : settings)
         {
-            setting.second->loadFromPreferences(FilesystemModule::Utilities::SettingsPreference());
+            setting->loadFromPreferences(FilesystemModule::Utilities::SettingsPreference());
         }
 
         return settings;
@@ -254,26 +230,6 @@ public:
             LED_Utils::setThemeColor(color);
             auto interfaceColor = LedPatternInterface::ThemeColor();
             ESP_LOGI(TAG_COMPASS, "LED Interface::ThemeColor: %d, %d, %d", interfaceColor.r, interfaceColor.g, interfaceColor.b);
-
-            // Lora Module
-            LoraUtils::SetUserName(doc["User Name"].as<std::string>());
-            LoraUtils::SetDefaultSendAttempts(doc["Broadcast Attempts"].as<uint8_t>());
-
-            // ArduinoLora.SetFrequency(frequency);
-            ArduinoLora.SetSpreadingFactor(7);
-            ArduinoLora.SetSignalBandwidth(125E3);
-
-            #if HARDWARE_VERSION == 1
-            ArduinoLora.SetTXPower(20);
-            #endif
-
-            #if HARDWARE_VERSION == 2
-            ArduinoLora.SetTXPower(23);
-            #endif
-
-            #if HARDWARE_VERSION == 3
-            ArduinoLora.SetTXPower(23);
-            #endif
 
             ESP_LOGD(TAG_COMPASS, "ProcessSettingsFile: Done");
         }
@@ -333,13 +289,13 @@ public:
         RpcModule::Utilities::RegisterRpc("GetSavedLocations", NavigationUtils::RpcGetSavedLocations);
 
         // Saved Messages
-        RpcModule::Utilities::RegisterRpc("AddSavedMessage", LoraUtils::RpcAddSavedMessage);
-        RpcModule::Utilities::RegisterRpc("AddSavedMessages", LoraUtils::RpcAddSavedMessages);
-        RpcModule::Utilities::RegisterRpc("DeleteSavedMessage", LoraUtils::RpcDeleteSavedMessage);
-        RpcModule::Utilities::RegisterRpc("DeleteSavedMessages", LoraUtils::RpcDeleteSavedMessages);
-        RpcModule::Utilities::RegisterRpc("GetSavedMessage", LoraUtils::RpcGetSavedMessage);
-        RpcModule::Utilities::RegisterRpc("GetSavedMessages", LoraUtils::RpcGetSavedMessages);
-        RpcModule::Utilities::RegisterRpc("UpdateSavedMessage", LoraUtils::RpcUpdateSavedMessage);
+        RpcModule::Utilities::RegisterRpc("AddSavedMessage", WayfinderLoraState::RpcAddSavedMessage);
+        RpcModule::Utilities::RegisterRpc("AddSavedMessages", WayfinderLoraState::RpcAddSavedMessages);
+        RpcModule::Utilities::RegisterRpc("DeleteSavedMessage", WayfinderLoraState::RpcDeleteSavedMessage);
+        RpcModule::Utilities::RegisterRpc("DeleteSavedMessages", WayfinderLoraState::RpcDeleteSavedMessages);
+        RpcModule::Utilities::RegisterRpc("GetSavedMessage", WayfinderLoraState::RpcGetSavedMessage);
+        RpcModule::Utilities::RegisterRpc("GetSavedMessages", WayfinderLoraState::RpcGetSavedMessages);
+        RpcModule::Utilities::RegisterRpc("UpdateSavedMessage", WayfinderLoraState::RpcUpdateSavedMessage);
 
         // Settings
         RpcModule::Utilities::RegisterRpc("GetSettings", FilesystemModule::Utilities::RpcGetSettingsFile);
@@ -354,21 +310,6 @@ public:
         // System
         RpcModule::Utilities::RegisterRpc("RestartSystem", [](JsonDocument &_) { ESP.restart();  vTaskDelay(1000 / portTICK_PERIOD_MS); });
         RpcModule::Utilities::RegisterRpc("GetSystemInfo", System_Utils::GetSystemInfoRpc);
-        RpcModule::Utilities::RegisterRpc("GetDisplayContents", GetDisplayContentsRpc);
-
-        // Receive WiFi Credentials
-        RpcModule::Utilities::RegisterRpc("BroadcastWifiCredentials", [](JsonDocument &doc) 
-        { 
-            if (doc.containsKey("SSID") && doc.containsKey("Password"))
-            {
-                auto result = ConnectivityModule::RadioUtils::ConnectToAccessPoint(doc["SSID"].as<std::string>(), doc["Password"].as<std::string>());
-
-                if (result)
-                {
-                    ConnectivityModule::Utilities::DeinitializeEspNow().Invoke(false);
-                }
-            }
-        });
     }
 
     static void ClearLocations(uint8_t inputID)
@@ -378,301 +319,10 @@ public:
 
     static void ClearMessages(uint8_t inputID)
     {
-        LoraUtils::ClearSavedMessages();
-    }
-
-    static void BoundRadioTask(void *pvParameters)
-    {
-        LoraManager *manager = (LoraManager *)pvParameters;
-        manager->RadioTask();
-    }
-
-    static void BoundSendQueueTask(void *pvParameters)
-    {
-        LoraManager *manager = (LoraManager *)pvParameters;
-        manager->SendQueueTask();
-    }
-
-    static void GetDisplayContentsRpc(JsonDocument &doc)
-    {
-        doc["width"] = display.width();
-        doc["height"] = display.height();
-
-        size_t bufferLength = (display.width() * display.height()) / 8;
-        uint8_t* displayBuffer = display.getBuffer();
-
-        // 128x128 resolution = 2048 bytes, b64 encoded = 2730 chars
-        unsigned char contents[3000];
-        size_t b64_len = 0;
-        auto res = mbedtls_base64_encode(contents, sizeof(contents), &b64_len, displayBuffer, bufferLength);
-        ESP_LOGI(TAG, "Encoded buffer of size %d into %d b64 bytes (res=%d)", bufferLength, b64_len, res);
-
-        if (res == 0) {
-            doc["buffer"] = String(contents, b64_len);
-        }
+        WayfinderLoraState::ClearSavedMessages();
     }
 
     // Display Module
-
-    static void InitializeDisplayManager()
-    {
-        ESP_LOGI(TAG, "Initializing display driver...");
-        auto displayPtr = InitializeDisplayDriver();
-
-        DisplayManagerInstance.Initialize(displayPtr, OLED_WIDTH, OLED_HEIGHT); 
-
-        DisplayModule::initDefaultLayers();
-
-        // Wire up input draw commands
-        auto windowLayer = std::static_pointer_cast<DisplayModule::WindowLayer>(DisplayModule::Utilities::getLayer(DisplayModule::LayerID::WINDOW));
-
-#if HARDWARE_VERSION == 1
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd("^", fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd("v", fmt);
-            cmd.draw(drawCtx);
-        });
-
-#elif HARDWARE_VERSION == 2
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd("^", fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd("v", fmt);
-            cmd.draw(drawCtx);
-        });
-
-#elif HARDWARE_VERSION == 3
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_1, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_2, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_3, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::LEFT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::BUTTON_4, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::RIGHT;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd(inputText, fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_UP, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::TOP;
-
-            DisplayModule::TextDrawCommand cmd("^", fmt);
-            cmd.draw(drawCtx);
-        });
-
-        windowLayer->registerFactory(DisplayModule::InputID::ENC_DOWN, [](DisplayModule::DrawContext &drawCtx, const std::string &inputText)
-        {
-            if (inputText.empty()) return;
-
-            DisplayModule::TextFormat fmt;
-            fmt.hAlign = DisplayModule::TextAlignH::CENTER;
-            fmt.vAlign = DisplayModule::TextAlignV::BOTTOM;
-
-            DisplayModule::TextDrawCommand cmd("v", fmt);
-            cmd.draw(drawCtx);
-        });
-
-#endif
-
-#if HARDWARE_VERSION < 3 || defined(USE_V3_OLED)
-        DisplayModule::Utilities::onRenderComplete += []()
-        {
-            display.display();
-        };
-#endif
-
-        InitializeHomeWindow();
-    }
-
-    static Adafruit_GFX *InitializeDisplayDriver()
-    {
-#if HARDWARE_VERSION < 3
-        display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-        display.clearDisplay();
-
-        display.setTextSize(1);
-        display.setTextColor(SSD1306_WHITE);
-        display.setCursor(0, 0);
-        display.display();
-
-        return static_cast<Adafruit_GFX *>(&display);
-#else
-#ifdef USE_V3_OLED
-        ESP_LOGI(TAG, "Initializing SSD1327...");
-        auto result = display.begin(0x3C);
-
-        if (result)
-        {
-            ESP_LOGI(TAG, "SSD1327 Initialized.");
-            display.setRotation(2);
-            display.clearDisplay();
-            display.setContrast(0x7F);
-            display.setTextColor(SSD1327_WHITE);
-        }
-        else
-        {
-            ESP_LOGW(TAG, "SSD1327 Failed to initialize.");
-        }
-#else
-        display.setTextColor(WHITE);
-#endif
-
-        display.setTextSize(1);
-        display.setCursor(0, 0);
-        return static_cast<Adafruit_GFX *>(&display);
-#endif
-    }
 
     static void InitializeHomeWindow()
     {
@@ -723,6 +373,12 @@ public:
             auto diagnosticsWindow = std::make_shared<DisplayModule::DiagnosticsWindow>();
             DisplayModule::Utilities::pushWindow(diagnosticsWindow);
         }));
+        #if HARDWARE_VERSION >= 3
+        menuItems.push_back(DisplayModule::MenuItem("Breakout", []()
+        {
+            DisplayModule::Utilities::pushWindow(std::make_shared<DisplayModule::BreakoutWindow>());
+        }));
+        #endif
         menuItems.push_back(DisplayModule::MenuItem("Reboot", []()
         {
             auto drawCtx = DisplayModule::Utilities::drawContext();
@@ -736,6 +392,14 @@ public:
             ESP.restart();
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }));
+
+        if (System_Utils::getSystemShutdown().Count())
+        {
+            menuItems.push_back(DisplayModule::MenuItem("Shutdown", []()
+            {
+                System_Utils::systemShutdownInvoke();
+            }));
+        }
 
         auto mainMenuWindowPtr = DisplayModule::makeMenuWindow(menuItems);
 

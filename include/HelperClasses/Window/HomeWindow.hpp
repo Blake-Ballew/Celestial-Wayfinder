@@ -5,7 +5,6 @@
 #include "States/TrackingState.hpp"
 #include "States/SelectMessageState.hpp"
 #include "States/SelectLocationState.hpp"
-#include "States/UnreadMessageState.hpp"
 #include "States/SelectKeyValueState.hpp"
 #include "States/LockState.hpp"
 #include "States/DisplaySentMessageState.hpp"
@@ -14,6 +13,8 @@
 #include "DisplayUtilities.hpp"
 #include "LoraUtils.h"
 #include "NavigationUtils.h"
+#include "HelperClasses/WayfinderLoraState.hpp"
+#include "HelperClasses/PingMessage.hpp"
 #include <functional>
 #include "../Led/Patterns/Flashlight.hpp"
 
@@ -57,7 +58,7 @@ namespace DisplayModule
             _lockState         = std::make_shared<LockState>();
             _selectMsgState    = std::make_shared<SelectMessageState>();
             _selectLocState    = std::make_shared<SelectLocationState>();
-            _unreadState       = std::make_shared<UnreadMessageState>();
+            // _unreadState       = std::make_shared<UnreadMessageState>();
             _selectKVState     = std::make_shared<SelectKeyValueState>();
             _sentMsgState      = std::make_shared<DisplaySentMessageState>();
             _repeatState       = std::make_shared<RepeatMessageState>();
@@ -85,11 +86,11 @@ namespace DisplayModule
         ~HomeWindow() = default;
 
         // Override to handle the "show unread messages" external trigger
-        void showUnreadMessages()
-        {
-            if (Utilities::activeWindow().get() == this)
-                switchState(_unreadState);
-        }
+        // void showUnreadMessages()
+        // {
+        //     if (Utilities::activeWindow().get() == this)
+        //         switchState(_unreadState);
+        // }
 
         // Override to handle the "show sent message" external trigger
         void showSentMessage()
@@ -113,14 +114,14 @@ namespace DisplayModule
         std::shared_ptr<LockState>             _lockState;
         std::shared_ptr<SelectMessageState>    _selectMsgState;
         std::shared_ptr<SelectLocationState>   _selectLocState;
-        std::shared_ptr<UnreadMessageState>    _unreadState;
+        // std::shared_ptr<UnreadMessageState>    _unreadState;
         std::shared_ptr<SelectKeyValueState>   _selectKVState;
         std::shared_ptr<DisplaySentMessageState> _sentMsgState;
         std::shared_ptr<RepeatMessageState>    _repeatState;
         std::shared_ptr<MenuState>             _actionMenuState;
         std::shared_ptr<EditStringState>       _saveMessageState;
         std::shared_ptr<EditStringState>       _saveLocationState;
-        std::shared_ptr<ViewMessageState>        _viewMessageState;
+        std::shared_ptr<ViewMessageState>      _viewMessageState;
 
         // Pending reply recipient (set when BUTTON_2 from UnreadMessageState)
         uint64_t _pendingReplyRecipient = 0;
@@ -159,7 +160,7 @@ namespace DisplayModule
                 InputID::ENC_DOWN,
                 [this](const InputContext &ctx)
                 {
-                    if (LoraUtils::GetNumUnreadMessages() > 0)
+                    if (WayfinderLoraState::GetNumUnread() > 0)
                     {
                         pushState(_viewMessageState);
                     }
@@ -169,7 +170,7 @@ namespace DisplayModule
                 InputID::ENC_UP, 
                 [this](const InputContext &ctx)
                 {
-                    if (LoraUtils::MyLastBroacastExists())
+                    if (LoraUtils::MyLastBroadcastExists())
                     {
                         pushState(_sentMsgState);
                     }
@@ -234,29 +235,22 @@ namespace DisplayModule
                 System_Utils::GetCurrentUTC(currentTime);
                 NavigationUtils::TimeTToGpsPacked(currentTime, gpsTime, gpsDate);
 
-                // TODO: UPDATE LORA MODULE TO USE SHARED PTR
-                // Build Message selector with preselection based on selected location (if applicable)
-                auto pingMessage = new MessagePing(
-                    gpsTime,
-                    gpsDate,
-                    // We only broadcast. Hardcoded recipientId to 0x0 for backwards compatibility
-                    0x0,
-                    LoraUtils::UserID(),
-                    LoraUtils::UserName().c_str(),
-                    0,
-                    LED_Utils::ThemeColor().r,
-                    LED_Utils::ThemeColor().g,
-                    LED_Utils::ThemeColor().b,
-                    myLat,
-                    myLon,
-                    //TODO: use std::string for message content in MessagePing to avoid this c_str() nonsense
-                    payload["Message"].as<const char *>()
-                );
-
-                auto sendAttempts = FilesystemModule::Utilities::FetchIntSetting("Num Broadcasts", 3);
+                auto ping = std::make_shared<PingMessage>();
+                ping->msgID       = esp_random();
+                ping->sender      = LoraUtils::UserID();
+                ping->bouncesLeft = 3;
+                ping->time        = gpsTime;
+                ping->date        = gpsDate;
+                ping->senderName  = LoraUtils::UserName();
+                ping->color_R     = LED_Utils::ThemeColor().r;
+                ping->color_G     = LED_Utils::ThemeColor().g;
+                ping->color_B     = LED_Utils::ThemeColor().b;
+                ping->lat         = myLat;
+                ping->lng         = myLon;
+                ping->status      = payload["Message"].as<std::string>();
 
                 // Send Payload
-                auto success = LoraUtils::SendMessage(pingMessage, static_cast<uint8_t>(sendAttempts));
+                auto success = LoraUtils::SendMessage(ping);
 
                 auto &drawCtx = Utilities::drawContext();
                 drawCtx.display->fillScreen(BLACK);
@@ -297,7 +291,7 @@ namespace DisplayModule
 
                 if (payload->containsKey("return"))
                 {
-                    LoraUtils::AddSavedMessage(payload->operator[]("return").as<const char *>(), true);
+                    WayfinderLoraState::AddSavedMessage(payload->operator[]("return").as<const char *>(), true);
                     returnMsg = "Message saved";
                     ESP_LOGI(TAG, "Saved message: %s", payload->operator[]("return").as<const char *>());
                 }
@@ -365,18 +359,9 @@ namespace DisplayModule
             });
 
             _viewMessageState->bindInput(InputID::BUTTON_3, "Mark Read", [this](const InputContext &ctx) {
-                LoraUtils::MarkMessageOpened(LoraUtils::GetCurrentUnreadMessageSenderID());
-                
-                if (LoraUtils::IsUnreadMessageIteratorAtEnd())
+                if (!_viewMessageState->markCurrentRead())
                 {
-                    if (LoraUtils::GetNumUnreadMessages() == 0)
-                    {
-                        popState();
-                    }
-                    else
-                    {
-                        LoraUtils::DecrementUnreadMessageIterator();
-                    }
+                    popState();
                 }
             });
 
@@ -449,9 +434,9 @@ namespace DisplayModule
                 if (selectedKey == "Message")
                 {
                     auto msg = _viewMessageState->currentMessage();
-                    auto pingMsg = static_cast<MessagePing *>(msg);
+                    auto pingMsg = std::static_pointer_cast<PingMessage>(msg);
 
-                    LoraUtils::AddSavedMessage(pingMsg->status, true);
+                    WayfinderLoraState::AddSavedMessage(pingMsg->status);
                     popState(); 
                     auto &drawCtx = Utilities::drawContext();
                     drawCtx.display->fillScreen(BLACK);
@@ -463,7 +448,7 @@ namespace DisplayModule
                 else if (selectedKey == "Location")
                 {
                     auto msg = _viewMessageState->currentMessage();
-                    auto pingMsg = static_cast<MessagePing *>(msg);
+                    auto pingMsg = std::static_pointer_cast<PingMessage>(msg);
 
                     SavedLocation loc;
                     loc.Name = pingMsg->status;
@@ -527,8 +512,8 @@ namespace DisplayModule
                 arr.add(preselectPayload->operator[]("Name"));
             }
 
-            for (auto it = LoraUtils::SavedMessageListBegin();
-                 it != LoraUtils::SavedMessageListEnd(); ++it)
+            for (auto it = WayfinderLoraState::SavedMessageListBegin();
+                 it != WayfinderLoraState::SavedMessageListEnd(); ++it)
             {
                 arr.add(*it);
             }
@@ -576,11 +561,22 @@ namespace DisplayModule
             menuItems.push_back(DisplayModule::MenuItem("Toggle Silent Mode", []()
             {
                 System_Utils::silentMode = !System_Utils::silentMode;
-                auto setting = std::static_pointer_cast<FilesystemModule::BoolSetting>(FilesystemModule::Utilities::DeviceSettings()["Silent Mode"]);
-                setting->value = System_Utils::silentMode;
-                setting->saveToPreferences(FilesystemModule::Utilities::SettingsPreference());
+                auto raw = FilesystemModule::Utilities::FindSetting("Silent Mode");
+                if (raw)
+                {
+                    auto setting = std::static_pointer_cast<FilesystemModule::BoolSetting>(raw);
+                    setting->value = System_Utils::silentMode;
+                    setting->saveToPreferences(FilesystemModule::Utilities::SettingsPreference());
+                }
             }));
-            
+
+            if (System_Utils::getSystemShutdown().Count())
+            {
+                menuItems.push_back(DisplayModule::MenuItem("Shutdown", []()
+                {
+                    System_Utils::systemShutdownInvoke();
+                }));
+            }            
         }
     };
 

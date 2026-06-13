@@ -3,10 +3,11 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "MessagePing.h"
+#include "HelperClasses/PingMessage.hpp"
+#include "LoraUtils.h"
+#include "LoraUtilities.hpp"
 #include "WindowState.hpp"
 #include "TextDrawCommand.hpp"
-#include "LoraUtils.h"
 
 namespace DisplayModule
 {
@@ -32,11 +33,7 @@ namespace DisplayModule
     public:
         DisplaySentMessageState()
         {
-        }
-
-        ~DisplaySentMessageState()
-        {
-            _deleteMessage();
+            refreshIntervalMs = 500;
         }
 
         // ------------------------------------------------------------------
@@ -45,26 +42,34 @@ namespace DisplayModule
 
         void onEnter(const StateTransferData &) override
         {
-            _deleteMessage();
-            _message    = LoraUtils::MyLastBroacast();
+            _message = nullptr;
+            auto base = LoraUtils::MyLastBroadcast();
+            _message = std::static_pointer_cast<PingMessage>(base);
             _hasMessage = (_message != nullptr);
+            _lastEchoCount = LoraModule::Utilities::GetEchoCount();
 
             _rebuildDrawCommands();
         }
 
+        void onTick() override
+        {
+            uint32_t current = LoraModule::Utilities::GetEchoCount();
+            if (current != _lastEchoCount)
+            {
+                _lastEchoCount = current;
+                _rebuildDrawCommands();
+            }
+        }
+
         void onExit() override
         {
-            _deleteMessage();
+            _message = nullptr;
             WindowState::onExit();
         }
 
-        // ------------------------------------------------------------------
-        // Result payload for retransmit (call before the state exits)
-        // ------------------------------------------------------------------
-
         std::shared_ptr<ArduinoJson::DynamicJsonDocument> buildRetransmitPayload() const
         {
-            if (!_message) return nullptr;
+            if (!_message) { return nullptr; }
             auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(512);
             _message->serialize(*doc);
             return doc;
@@ -73,24 +78,18 @@ namespace DisplayModule
         bool hasMessage() const { return _hasMessage; }
 
     private:
-        MessageBase *_message = nullptr;
-        bool        _hasMessage = false;
+        std::shared_ptr<PingMessage> _message;
+        bool _hasMessage = false;
+        uint32_t _lastEchoCount = 0;
 
         const uint8_t _LARGE_DISPLAY_MIN_LINES = 16;
         const uint8_t _MED_DISPLAY_MIN_LINES = 8;
         const uint8_t _MIN_DISPLAY_MIN_LINES = 4;
 
-        void _deleteMessage()
-        {
-            delete _message;
-            _message  = nullptr;
-            _hasMessage = false;
-        }
-
         void _rebuildDrawCommands()
         {
             clearDrawCommands();
-            auto pingMsg = static_cast<MessagePing *>(_message);
+            auto pingMsg = _message;
 
             if (!_message)
             {
@@ -99,6 +98,11 @@ namespace DisplayModule
             }
 
             std::string ageInfo = std::string("Sent ") + _displayMessageAge(pingMsg) + " ago";
+
+            uint32_t echoes = LoraModule::Utilities::GetEchoCount();
+            std::string relayInfo = echoes == 0
+                ? "No echoes yet"
+                : (std::to_string(echoes) + (echoes == 1 ? " echo" : " echoes"));
 
             auto distance = NavigationUtils::GetDistanceTo(pingMsg->lat, pingMsg->lng);
             std::string distanceInfo;
@@ -145,7 +149,12 @@ namespace DisplayModule
                     distanceInfo,
                     TextFormat{ TextAlignH::CENTER, TextAlignV::LINE, 5 }
                 ));
-            } 
+
+                addDrawCommand(std::make_shared<TextDrawCommand>(
+                    relayInfo,
+                    TextFormat{ TextAlignH::CENTER, TextAlignV::LINE, 6 }
+                ));
+            }
             else if (displayLines >= _MED_DISPLAY_MIN_LINES)
             {
                 addDrawCommand(std::make_shared<TextDrawCommand>(
@@ -172,7 +181,12 @@ namespace DisplayModule
                     distanceInfo,
                     TextFormat{ TextAlignH::CENTER, TextAlignV::LINE, 5 }
                 ));
-            } 
+
+                addDrawCommand(std::make_shared<TextDrawCommand>(
+                    relayInfo,
+                    TextFormat{ TextAlignH::CENTER, TextAlignV::LINE, 6 }
+                ));
+            }
             else if (displayLines >= _MIN_DISPLAY_MIN_LINES)
             {
                 addDrawCommand(std::make_shared<TextDrawCommand>(
@@ -201,7 +215,7 @@ namespace DisplayModule
             return "=====================";
         }
 
-        std::string _displayMessageAge(MessagePing *ping)
+        std::string _displayMessageAge(const std::shared_ptr<PingMessage>& ping)
         {
             if (!ping) return "";
 

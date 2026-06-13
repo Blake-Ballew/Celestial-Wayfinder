@@ -10,7 +10,6 @@
 
 #include <ArduinoJson.hpp>
 
-#include "LoraManager.h"
 #include "NavigationManager.h"
 
 #include "CompassUtils.h"
@@ -21,7 +20,7 @@
 #include "IlluminateButton.hpp"
 #include "RingPulse.hpp"
 
-#include "MessagePing.h"
+#include "HelperClasses/PingMessage.hpp"
 
 #include <unordered_map>
 
@@ -30,54 +29,29 @@
     #include "Bootstrap/V1/BootstrapLeds.hpp"
     #include "Bootstrap/V1/BootstrapNavigation.hpp"
     #include "Bootstrap/V1/BootstrapDisplay.hpp"
+    #include "Bootstrap/V1/BootstrapLora.hpp"
 #elif HARDWARE_VERSION == 2
     #include "Bootstrap/V2/BootstrapMicrocontroller.hpp"
     #include "Bootstrap/V2/BootstrapLeds.hpp"
     #include "Bootstrap/V2/BootstrapNavigation.hpp"
     #include "Bootstrap/V2/BootstrapDisplay.hpp"
+    #include "Bootstrap/V2/BootstrapLora.hpp"
 #elif HARDWARE_VERSION == 3
     #include "Bootstrap/V3/BootstrapMicrocontroller.hpp"
     #include "Bootstrap/V3/BootstrapLeds.hpp"
     #include "Bootstrap/V3/BootstrapNavigation.hpp"
     #include "Bootstrap/V3/BootstrapDisplay.hpp"
+    #include "Bootstrap/V3/BootstrapLora.hpp"
 #else
     #error "Unknown HARDWARE_VERSION. Must be 1, 2, or 3."
 #endif
+
+#include "Bootstrap/Common/BootstrapRpc.hpp"
 
 extern "C"
 {
 #include "bootloader_random.h"
 }
-
-namespace
-{
-  const uint8_t CPU_CORE_LORA = 1;
-  const uint8_t CPU_CORE_APP = 0;
-  const uint8_t RF95_TX_PWR = 20;
-
-  #if HARDWARE_VERSION < 3
-  const uint8_t LORA_CS = 15;
-  const uint8_t LORA_RST = -1;
-  const uint8_t LORA_DIO0 = 18;
-  #else
-  const uint8_t LORA_CS = 39;
-  const uint8_t LORA_RST = 38;
-  const uint8_t LORA_DIO0 = 48;
-  const uint8_t LORA_SCK = 40;
-  const uint8_t LORA_MISO = 42;
-  const uint8_t LORA_MOSI = 41;
-
-  #endif
-}
-
-#if HARDWARE_VERSION < 3
-SPIClass loraSpi(HSPI);
-#else
-SPIClass loraSpi;
-#endif
-
-ArduinoLoRaDriver CompassUtils::ArduinoLora(&loraSpi, LORA_CS, LORA_RST, LORA_DIO0, 915E6);
-LoraManager loraManager(&CompassUtils::ArduinoLora);
 
 void enableInterruptsHandler();
 void disableInterruptsHandler();
@@ -87,7 +61,7 @@ void Bootstrap();
 void setup()
 {
   Serial.begin(115200);
-  vTaskDelay(1000);
+  vTaskDelay(pdMS_TO_TICKS(3000));
 
   bootloader_random_enable();
   
@@ -96,46 +70,9 @@ void setup()
   
   vTaskDelay(300);
 
-  // Initialize Lora Module
-  #if HARDWARE_VERSION == 3
-  loraSpi.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
-  #endif
-  auto success = loraManager.Init();
+  // CompassUtils::WireFunctions();
 
-  if (!success)
-  {
-    ESP_LOGE(TAG, "Failed to initialize Lora module");
-  }
-
-  System_Utils::init();
-
-  displayCommandQueue = DisplayModule::Utilities::getDisplayCommandQueue();
-
-  // Register message types
-  ESP_LOGI(TAG, "Registering message types");
-  MessageBase::SetMessageType(0x01);
-  MessagePing::SetMessageType(0x02);
-
-  LoraUtils::RegisterMessageDeserializer(MessageBase::MessageType(), MessageBase::MessageFactory);
-  LoraUtils::RegisterMessageDeserializer(MessagePing::MessageType(), MessagePing::MessageFactory);
-
-  CompassUtils::InitializeDisplayManager();
-  // System_Utils::registerTask(Display_Manager::processCommandQueue, "displayTask", 12000, nullptr, 2, CPU_CORE_APP);
-
-  // Bind the radio send and receive tasks and then register them
-  ESP_LOGI(TAG, "Registering radio tasks");
-
-  int radioTaskID = System_Utils::registerTask(CompassUtils::BoundRadioTask, "radio-task", 4096, &loraManager, 3, CPU_CORE_LORA);
-  int sendQueueTaskID = System_Utils::registerTask(CompassUtils::BoundSendQueueTask, "send-queue-task", 4096, &loraManager, 2, CPU_CORE_LORA);
-
-  LoraUtils::MessageReceived() += CompassUtils::PassMessageReceivedToDisplay;
-
-  // Initialize RPC
-  CompassUtils::InitializeRpc(1, CPU_CORE_LORA);
-
-  CompassUtils::WireFunctions();
-
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  // vTaskDelay(1000 / portTICK_PERIOD_MS);
 
   System_Utils::getEnableInterrupts() += enableInterruptsHandler;
   System_Utils::getDisableInterrupts() += disableInterruptsHandler;
@@ -190,5 +127,7 @@ void Bootstrap()
   BootstrapLeds::Initialize();
   BootstrapNavigation::Initialize();
   BootstrapDisplay::Inititalize();
+  BootstrapLora::Initialize();
+  BootstrapRpc::Initialize();
 }
 

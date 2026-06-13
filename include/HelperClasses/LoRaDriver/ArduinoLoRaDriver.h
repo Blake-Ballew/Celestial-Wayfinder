@@ -1,6 +1,7 @@
 #include "LoraDriverInterface.h"
 #include <LoRa.h>
-#include "esp_log.h"
+#include <esp_log.h>
+#include <freertos/semphr.h>
 
 static const char *TAG_LORA = "LORA";
 
@@ -15,12 +16,15 @@ public:
         _dio0(dio0),
         _loraFrequency(loraFrequency)
     {
-
+        _instance = this;
     }
 
     bool Init()
     {
         ESP_LOGI(TAG_LORA, "Initializing LoRa...");
+
+        static StaticSemaphore_t cadSemBuf;
+        _cadSemaphore = xSemaphoreCreateBinaryStatic(&cadSemBuf);
         if (_spi == nullptr)
         {
             ESP_LOGW(TAG_LORA, "No valid Spi bus detected");
@@ -49,71 +53,100 @@ public:
 
         LoRa.setCodingRate4(8);
         LoRa.setSpreadingFactor(7);
-        LoRa.setSignalBandwidth(125E3);
+        LoRa.setSignalBandwidth(500E3);
+        LoRa.setPreambleLength(12);
         LoRa.setSPIFrequency(_spiFrequency);
         return result;
     }
 
-    bool ReceiveMessage(JsonDocument &doc, size_t timeout = 0)
+    bool ReceiveMessage(uint8_t* buffer, size_t& outLen, size_t timeout) override
     {
-        auto startTime = xTaskGetTickCount();
-
-        do
+        // Interrupt mode: library ISR already buffered the packet into its internal state
+        // (_rxPacketLength set, FIFO pointer ready, IRQ flags cleared).
+        // LoRa.available() reflects this without needing parsePacket().
+        if (LoRa.available() > 0)
         {
-            size_t msgSize = 0;
-            uint8_t buffer[256];
-            memset(buffer, 0, sizeof(buffer));
-
-            if (LoRa.parsePacket() == 0) continue;
-
+            outLen = 0;
             while (LoRa.available())
             {
-                buffer[msgSize] = (uint8_t)(LoRa.read() & 0xFF);
-                msgSize++;
+                buffer[outLen++] = (uint8_t)(LoRa.read() & 0xFF);
+            }
+            return outLen > 0;
+        }
+
+        // Polling fallback (used when timeout > 0 or no ISR registered)
+        auto startTime = xTaskGetTickCount();
+        do
+        {
+            if (LoRa.parsePacket() == 0) { continue; }
+
+            outLen = 0;
+            while (LoRa.available())
+            {
+                buffer[outLen++] = (uint8_t)(LoRa.read() & 0xFF);
             }
 
-            if (msgSize == 0) continue;
-
-            #if DEBUG == 1
-            // ESP_LOGD(TAG_LORA, "Message of length %d received", msgSize);
-            // for (auto i = 0; i < msgSize; i++)
-            // {
-            //     printf("%02X ", buffer[i]);
-            // }
-            // printf("\n");
-            #endif
-
-            auto result = deserializeMsgPack(doc, (const uint8_t *)buffer, sizeof(buffer));
-
-#if DEBUG == 1
-            ESP_LOGD(TAG_LORA, "Deserialization result: %d", result.code());
-#endif
-            return result.code() == DeserializationError::Ok;
+            return outLen > 0;
         }
         while ((xTaskGetTickCount() - startTime) < timeout);
 
         return false;
     }
 
-    bool SendMessage(JsonDocument &doc)
+    void RegisterOnReceive(void(*callback)(int)) override
     {
-        auto msgSize = measureMsgPack(doc);
-        // uint8_t buffer[msgSize];
-        // memset(buffer, 0, msgSize);
+        LoRa.onReceive(callback);
+    }
 
-        // serializeMsgPack(doc, buffer, sizeof(buffer));
+    void StartReceiving() override
+    {
+        LoRa.receive();
+    }
 
-        #if DEBUG == 1
-        ESP_LOGD(TAG_LORA, "Sending message:");
-        serializeJson(doc, Serial);
-        #endif
+    int PacketRssi() override
+    {
+        return LoRa.packetRssi();
+    }
+
+    bool IsChannelBusy() override
+    {
+        xSemaphoreTake(_cadSemaphore, 0);  // drain any stale give from a previous scan
+
+        // SX127x requires Standby before CAD — going directly from RX to CAD
+        // can leave the radio in an undefined state on some silicon revisions.
+        LoRa.idle();
+
+        LoRa.onCadDone(_onCadDone);
+        LoRa.channelActivityDetection();
+
+        // Block until the DIO0 CadDone interrupt fires (~2 ms at SF7/125 kHz)
+        if (xSemaphoreTake(_cadSemaphore, pdMS_TO_TICKS(50)) != pdTRUE)
+        {
+            ESP_LOGW(TAG_LORA, "CAD timeout — assuming clear");
+            return false;
+        }
+        return _cadResult;
+    }
+
+    bool SendMessage(const uint8_t* buffer, size_t len) override
+    {
+        if (len > 255)
+        {
+            ESP_LOGE(TAG_LORA, "Payload %u bytes exceeds LoRa 255-byte limit — dropping", len);
+            return false;
+        }
+
+        // Force Standby so beginPacket() never sees a non-TX busy state
+        // (radio may be in CAD, RX, or an intermediate mode at this point)
+        LoRa.idle();
 
         if (LoRa.beginPacket())
         {
-            serializeMsgPack(doc, LoRa);
+            LoRa.write(buffer, len);
             return LoRa.endPacket() == 1;
         }
-        
+
+        ESP_LOGE(TAG_LORA, "beginPacket() returned 0 after idle()");
         return false;
     }
 
@@ -148,4 +181,12 @@ protected:
 
     uint32_t _loraFrequency;
 
+private:
+    // Defined in EventDeclarations.cpp so IRAM_ATTR body is in a .cpp translation unit
+    // (Xtensa l32r cannot reference flash literals from an inline IRAM function in a header)
+    static void IRAM_ATTR _onCadDone(bool channelBusy);
+
+    inline static SemaphoreHandle_t _cadSemaphore = nullptr;
+    inline static ArduinoLoRaDriver* _instance = nullptr;
+    bool _cadResult = false;
 };

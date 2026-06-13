@@ -35,7 +35,7 @@
 #define NUM_COMPASS_LEDS 32
 
 #define LED_IDX_LEFT_TRACE 5
-#define LED_IDX_RIGHT_TRACE 57
+#define LED_IDX_RIGHT_TRACE 49
 #define NUM_TRACE_LEDS 4
 
 #define LED_IDX_POWER_BUTTON 0
@@ -117,10 +117,10 @@ public:
     {
         static std::vector<size_t> compassRingIndicies = 
         {
-            17, 48, 47, 46, 45, 44, 43, 42, 
-            41, 40, 39, 38, 37, 36, 35, 34, 
+            9, 40, 39, 38, 37, 36, 35, 34, 
             33, 32, 31, 30, 29, 28, 27, 26, 
-            25, 24, 23, 22, 21, 20, 19, 18
+            25, 24, 23, 22, 21, 20, 19, 18,
+            17, 16, 15, 14, 13, 12, 11, 10
         };
 
         return compassRingIndicies;
@@ -136,8 +136,8 @@ public:
     {
         static std::vector<size_t> encoderRingIndicies = 
         {
-            49, 56, 55, 54,
-            53, 52, 51, 50
+            41, 48, 47, 46,
+            45, 44, 43, 42
         };
 
         return encoderRingIndicies;
