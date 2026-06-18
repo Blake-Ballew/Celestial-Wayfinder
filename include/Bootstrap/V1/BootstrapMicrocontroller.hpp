@@ -85,6 +85,16 @@ public:
             digitalWrite(KEEP_ALIVE_PIN, LOW);
         };
 
+        System_Utils::getEnablePowerSavings() += []()
+        {
+            setCpuFrequencyMhz(80);
+        };
+
+        System_Utils::getDisablePowerSavings() += []()
+        {
+            setCpuFrequencyMhz(240);
+        };
+
         auto healthTimerID = System_Utils::registerTimer("System Health Monitor", 60000, _MonitorSystemHealth, _HealthTimerBuffer());
         System_Utils::startTimer(healthTimerID);
         _MonitorSystemHealth(nullptr);

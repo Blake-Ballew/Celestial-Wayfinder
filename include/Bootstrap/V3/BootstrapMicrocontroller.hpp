@@ -8,6 +8,7 @@
 #include "CompassUtils.h"
 #include "globalDefines.h"
 #include "System_Utils.h"
+#include "WiFi.h"
 #include <BQ25672.h>
 
 #define BUZZER_PIN 7
@@ -92,6 +93,16 @@ public:
             Charger().setSdrvControl(BQ25672::SdrvCtrl::ShipMode);
         };
 
+        System_Utils::getEnablePowerSavings() += []()
+        {
+            setCpuFrequencyMhz(80);
+        };
+
+        System_Utils::getDisablePowerSavings() += []()
+        {
+            setCpuFrequencyMhz(240);
+        };
+
         System_Utils::registerBatteryCallback([]() -> long {
             uint16_t mv;
             if (!Charger().readVbat_mV(mv))
@@ -133,7 +144,6 @@ public:
         return scannedDevices;
     }
 
-private:
     static BQ25672 &Charger()
     {
         static BQ25672 charger(I2cBus());

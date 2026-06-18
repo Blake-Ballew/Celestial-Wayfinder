@@ -34,8 +34,8 @@
 #include "DiagnosticsWindow.hpp"
 #include "EditSavedLocationsWindow.hpp"
 #include "HelperClasses/Window/EditStatusMessagesWindow.hpp"
-#include "WiFiRpcWindow.hpp"
-#include "PairBluetoothWindow.hpp"
+#include "HelperClasses/Window/WiFiRpcWindow.hpp"
+#include "HelperClasses/Window/PairBluetoothWindow.hpp"
 
 static const char *TAG_COMPASS = "COMPASS";
 
@@ -114,6 +114,8 @@ public:
     static void CheckDeviceInfo()
     {
         auto& deviceInfo = FilesystemModule::Utilities::DeviceInfo();
+        deviceInfo.begin("DeviceInfo", false);
+
         if (!deviceInfo.isKey("UserID"))
         {
             uint32_t userID = esp_random();
@@ -135,6 +137,7 @@ public:
         }
 
         System_Utils::DeviceID = deviceInfo.getUInt("UserID");
+        deviceInfo.end();
     }
 
     static std::vector<std::shared_ptr<FilesystemModule::SettingsInterface>> GenerateSettings()
@@ -144,7 +147,9 @@ public:
         std::string defaultDeviceName;
         {
             char devicenamebuffer[20];
+            FilesystemModule::Utilities::DeviceInfo().begin("DeviceInfo", true);
             sprintf(devicenamebuffer, "Beacon_%04X", FilesystemModule::Utilities::DeviceInfo().getUInt("UserID") & 0xFFFF);
+            FilesystemModule::Utilities::DeviceInfo().end();
             defaultDeviceName = devicenamebuffer;
         }
 
@@ -179,10 +184,12 @@ public:
         auto wifiapPassword = std::make_shared<FilesystemModule::StringSetting>("WiFi AP Password", "esp-pass", 21);
         settings.push_back(wifiapPassword);
 
+        FilesystemModule::Utilities::SettingsPreference().begin(FilesystemModule::SettingsInterface::preference_namespace, true);
         for (const auto& setting : settings)
         {
             setting->loadFromPreferences(FilesystemModule::Utilities::SettingsPreference());
         }
+        FilesystemModule::Utilities::SettingsPreference().end();
 
         return settings;
     }
@@ -338,6 +345,8 @@ public:
 
         // Register Main Menu Items
         menuItems.push_back(DisplayModule::MenuItem("Settings", SettingsWindowFactory));
+
+        // #if HARDWARE_VERSION < 3
         menuItems.push_back(DisplayModule::MenuItem("Configure via WiFi", []()
         {
             auto wifiRpcWindow = std::make_shared<DisplayModule::WiFiRpcWindow>(true);
@@ -348,6 +357,8 @@ public:
             auto btRpcWindow = std::make_shared<DisplayModule::PairBluetoothWindow>();
             DisplayModule::Utilities::pushWindow(btRpcWindow);
         }));
+        // #endif
+
         menuItems.push_back(DisplayModule::MenuItem("Edit Status Messages", []()
         {
             auto editStatusMessagesWindow = std::make_shared<DisplayModule::EditStatusMessagesWindow>();
