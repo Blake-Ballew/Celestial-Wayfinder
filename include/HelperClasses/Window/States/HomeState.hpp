@@ -66,10 +66,10 @@ namespace DisplayModule
             _rebuildDrawCommands();
         }
 
-        static std::shared_ptr<ArduinoJson::DynamicJsonDocument>
+        static std::shared_ptr<ArduinoJson::JsonDocument>
         buildBroadcastPayload()
         {
-            auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(64);
+            auto doc = std::make_shared<ArduinoJson::JsonDocument>();
             (*doc)["sendDirect"] = false;
             return doc;
         }

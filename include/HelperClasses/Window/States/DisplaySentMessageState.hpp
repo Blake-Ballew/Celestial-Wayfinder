@@ -67,10 +67,10 @@ namespace DisplayModule
             WindowState::onExit();
         }
 
-        std::shared_ptr<ArduinoJson::DynamicJsonDocument> buildRetransmitPayload() const
+        std::shared_ptr<ArduinoJson::JsonDocument> buildRetransmitPayload() const
         {
             if (!_message) { return nullptr; }
-            auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(512);
+            auto doc = std::make_shared<ArduinoJson::JsonDocument>();
             _message->serialize(*doc);
             return doc;
         }

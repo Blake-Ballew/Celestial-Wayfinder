@@ -36,9 +36,9 @@ namespace DisplayModule
             // Calibration-prompt text state
             _promptState = std::make_shared<TextDisplayState>();
             {
-                auto promptPayload = std::make_shared<ArduinoJson::DynamicJsonDocument>(256);
-                auto arr = (*promptPayload).createNestedArray("txtLines");
-                auto obj = arr.createNestedObject();
+                auto promptPayload = std::make_shared<ArduinoJson::JsonDocument>();
+                auto arr = (*promptPayload)["txtLines"].to<ArduinoJson::JsonArray>();
+                auto obj = arr.add<ArduinoJson::JsonObject>();
                 obj["text"]   = "Start compass calibration?";
                 obj["hAlign"] = static_cast<int>(TextAlignH::CENTER);
                 obj["vAlign"] = static_cast<int>(TextAlignV::CENTER);
@@ -99,7 +99,7 @@ namespace DisplayModule
         std::shared_ptr<CompassDebugState>     _debugState;
         std::shared_ptr<TextDisplayState>      _promptState;
         std::shared_ptr<CompassCalibrateState> _calibrateState;
-        std::shared_ptr<ArduinoJson::DynamicJsonDocument> _promptPayload;
+        std::shared_ptr<ArduinoJson::JsonDocument> _promptPayload;
     };
 
 } // namespace DisplayModule

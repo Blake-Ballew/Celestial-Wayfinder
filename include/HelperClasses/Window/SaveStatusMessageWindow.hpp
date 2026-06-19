@@ -17,7 +17,7 @@ namespace DisplayModule
 
             StateTransferData initialData;
             {
-                auto payload = std::make_shared<ArduinoJson::DynamicJsonDocument>(64);
+                auto payload = std::make_shared<ArduinoJson::JsonDocument>();
                 (*payload)["cfgVal"] = "";
                 (*payload)["maxLen"] = static_cast<int>(PingMessage::STATUS_LENGTH);
                 initialData.payload = payload;

@@ -64,7 +64,7 @@ public:
 
         DisplayModule::Utilities::getInputRaised() += [](const DisplayModule::InputContext &ctx) {
             ESP_LOGI(TAG, "Button flash input: %d", ctx.inputID);
-            StaticJsonDocument<64> cfg;
+            JsonDocument cfg;
             cfg["inputID"] = ctx.inputID;
             auto buttonFlashPatternID = ButtonFlash::RegisteredPatternID();
             LED_Utils::configurePattern(buttonFlashPatternID, cfg);

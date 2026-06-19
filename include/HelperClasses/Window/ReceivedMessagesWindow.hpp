@@ -54,8 +54,8 @@ namespace DisplayModule
                 {
                     if (_currentState != _receivedState) { return; }
 
-                    auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(1024);
-                    auto arr = (*doc).createNestedArray("Messages");
+                    auto doc = std::make_shared<ArduinoJson::JsonDocument>();
+                    auto arr = (*doc)["Messages"].to<ArduinoJson::JsonArray>();
                     for (auto it = WayfinderLoraState::SavedMessageListBegin();
                          it != WayfinderLoraState::SavedMessageListEnd(); ++it)
                     {

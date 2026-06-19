@@ -86,10 +86,10 @@ namespace DisplayModule
             WindowState::onExit();
         }
 
-        std::shared_ptr<ArduinoJson::DynamicJsonDocument> buildEditPayload()
+        std::shared_ptr<ArduinoJson::JsonDocument> buildEditPayload()
         {
             _pendingAction = PendingAction::Edit;
-            auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(256);
+            auto doc = std::make_shared<ArduinoJson::JsonDocument>();
             if (WayfinderLoraState::GetSavedMessageListSize() > 0
                 && _selectedIt != WayfinderLoraState::SavedMessageListEnd())
             {
@@ -99,10 +99,10 @@ namespace DisplayModule
             return doc;
         }
 
-        std::shared_ptr<ArduinoJson::DynamicJsonDocument> buildCreatePayload()
+        std::shared_ptr<ArduinoJson::JsonDocument> buildCreatePayload()
         {
             _pendingAction = PendingAction::Create;
-            auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(64);
+            auto doc = std::make_shared<ArduinoJson::JsonDocument>();
             (*doc)["maxLen"] = static_cast<int>(PingMessage::STATUS_LENGTH);
             return doc;
         }
@@ -126,7 +126,7 @@ namespace DisplayModule
 
                 if (_scrollWheelID >= 0)
                 {
-                    ArduinoJson::StaticJsonDocument<64> cfg;
+                    ArduinoJson::JsonDocument cfg;
                     cfg["numItems"] = count;
                     cfg["currItem"] = std::distance(
                         WayfinderLoraState::SavedMessageListBegin(), _selectedIt);
