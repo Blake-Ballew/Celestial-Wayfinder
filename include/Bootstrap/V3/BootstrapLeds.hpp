@@ -103,6 +103,14 @@ public:
             LED_Utils::configurePattern(buttonFlashPatternID, cfg);
             LED_Utils::loopPattern(buttonFlashPatternID, 1);
         };
+
+        System_Utils::getEnablePowerSavings() += []() {
+            digitalWrite(LED_EN_PIN, LOW);
+        };
+
+        System_Utils::getDisablePowerSavings() += []() {
+            digitalWrite(LED_EN_PIN, HIGH);
+        };
     }
 
     static CRGB *LEDBuffer() 

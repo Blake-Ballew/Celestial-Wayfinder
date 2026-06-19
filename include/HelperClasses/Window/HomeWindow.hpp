@@ -153,6 +153,7 @@ namespace DisplayModule
                 [this](const InputContext &ctx)
                 {
                     pushState(_lockState);
+                    System_Utils::enablePowerSavingsInvoke();
                 });
 
 
@@ -237,7 +238,7 @@ namespace DisplayModule
 
                 auto ping = std::make_shared<PingMessage>();
                 ping->msgID       = esp_random();
-                ping->sender      = LoraUtils::UserID();
+                ping->sender      = System_Utils::DeviceID;
                 ping->bouncesLeft = 3;
                 ping->time        = gpsTime;
                 ping->date        = gpsDate;
@@ -248,6 +249,8 @@ namespace DisplayModule
                 ping->lat         = myLat;
                 ping->lng         = myLon;
                 ping->status      = payload["Message"].as<std::string>();
+
+                ESP_LOGI(TAG, "Sending ping message as %u", ping->sender);
 
                 // Send Payload
                 auto success = LoraUtils::SendMessage(ping);
@@ -391,6 +394,7 @@ namespace DisplayModule
         void _wireLockState()
         {
             _lockState->setOnSequenceComplete([this]() {
+                System_Utils::disablePowerSavingsInvoke();
                 popState(); // back to HomeState
             });
 

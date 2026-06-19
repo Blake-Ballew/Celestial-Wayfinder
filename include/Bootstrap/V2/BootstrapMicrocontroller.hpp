@@ -56,6 +56,16 @@ public:
 
         ScannedDevices() = CompassUtils::ScanI2cAddresses(I2cBus());
 
+        System_Utils::getEnablePowerSavings() += []()
+        {
+            setCpuFrequencyMhz(80);
+        };
+
+        System_Utils::getDisablePowerSavings() += []()
+        {
+            setCpuFrequencyMhz(240);
+        };
+
         System_Utils::registerBatteryCallback([]() -> long {
             uint32_t sum = 0;
             for (int i = 0; i < 8; i++) {
