@@ -104,7 +104,7 @@ namespace DisplayModule
 
         void _configureLeds()
         {
-            StaticJsonDocument<64> doc;
+            JsonDocument doc;
 
             doc["fadeDegrees"] = 20;
             doc["directionDegrees"] = _bearing;

@@ -206,7 +206,7 @@ namespace DisplayModule
             _selectLocState->bindInput(InputID::BUTTON_4, "Select", [this](const InputContext &ctx) {
 
                 // TODO: Dynamically allocate to a cap based on number of messages?
-                std::shared_ptr<DynamicJsonDocument> payload = std::make_shared<DynamicJsonDocument>(4096);
+                std::shared_ptr<JsonDocument> payload = std::make_shared<JsonDocument>();
                 _selectLocState->buildSelectPayload(payload);
                 _openMessageSelector(ctx, payload);
             });
@@ -220,7 +220,7 @@ namespace DisplayModule
 
             _selectMsgState->bindInput(InputID::BUTTON_4, "Select", [this](const InputContext &ctx) {
 
-                auto payload = DynamicJsonDocument(256);
+                auto payload = JsonDocument();
                 _selectMsgState->buildSelectPayload(payload);
 
                 double myLat, myLon = 0.0;
@@ -476,8 +476,8 @@ namespace DisplayModule
 
         void _openLocationSelector(const InputContext &ctx)
         {
-            auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(2048);
-            auto arr = (*doc).createNestedArray("Locations");
+            auto doc = std::make_shared<ArduinoJson::JsonDocument>();
+            auto arr = (*doc)["Locations"].to<ArduinoJson::JsonArray>();
 
             double myLat, myLon;
             if (!NavigationUtils::GetCurrentLocation(myLat, myLon))
@@ -488,7 +488,7 @@ namespace DisplayModule
                 return;
             }
 
-            JsonObject currentLoc = arr.createNestedObject();
+            JsonObject currentLoc = arr.add<ArduinoJson::JsonObject>();
             currentLoc["Name"] = "Ping";
             currentLoc["Lat"] = myLat;
             currentLoc["Lng"] = myLon;
@@ -496,7 +496,7 @@ namespace DisplayModule
             for (auto it = NavigationUtils::GetSavedLocationsBegin();
                 it != NavigationUtils::GetSavedLocationsEnd(); ++it)
             {
-                JsonObject locObj = arr.createNestedObject();
+                JsonObject locObj = arr.add<ArduinoJson::JsonObject>();
                 locObj["Name"] = it->Name;
                 locObj["Lat"] = it->Latitude;
                 locObj["Lng"] = it->Longitude;
@@ -508,9 +508,9 @@ namespace DisplayModule
             pushState(_selectLocState, d);
         }
 
-        void _openMessageSelector(const InputContext &ctx, std::shared_ptr<ArduinoJson::DynamicJsonDocument> preselectPayload)
+        void _openMessageSelector(const InputContext &ctx, std::shared_ptr<ArduinoJson::JsonDocument> preselectPayload)
         {
-            auto arr = preselectPayload->createNestedArray("Messages");
+            auto arr = (*preselectPayload)["Messages"].to<ArduinoJson::JsonArray>();
             if (preselectPayload->containsKey("Name"))
             {
                 arr.add(preselectPayload->operator[]("Name"));
@@ -535,7 +535,7 @@ namespace DisplayModule
             menuItems.push_back(DisplayModule::MenuItem("Flashlight", []()
             {
                 auto flashlightId = Flashlight::RegisteredPatternID();
-                StaticJsonDocument<64> doc;
+                JsonDocument doc;
                 doc["toggle"] = true;
                 LED_Utils::configurePattern(flashlightId, doc);
                 LED_Utils::iteratePattern(flashlightId);
@@ -544,7 +544,7 @@ namespace DisplayModule
 
             menuItems.push_back(DisplayModule::MenuItem("Create Status Message", [this]()
             {
-                auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(256);
+                auto doc = std::make_shared<ArduinoJson::JsonDocument>();
                 (*doc)["maxLen"] = 21;
                 (*doc)["cfgVal"] = "";
                 StateTransferData d;
@@ -554,7 +554,7 @@ namespace DisplayModule
 
             menuItems.push_back(DisplayModule::MenuItem("Save Current Location", [this]()
             {
-                auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(256);
+                auto doc = std::make_shared<ArduinoJson::JsonDocument>();
                 (*doc)["maxLen"] = 21;
                 (*doc)["cfgVal"] = "";
                 StateTransferData d;

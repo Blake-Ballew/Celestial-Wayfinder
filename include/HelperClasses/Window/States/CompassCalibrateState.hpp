@@ -76,7 +76,7 @@ namespace DisplayModule
             NavigationUtils::EndCalibration();
 
             // Persist calibration
-            ArduinoJson::StaticJsonDocument<256> calibDoc;
+            ArduinoJson::JsonDocument calibDoc;
             NavigationUtils::GetCalibrationData(calibDoc);
             FilesystemModule::Utilities::WriteFile(
                 NavigationUtils::GetCalibrationFilename(), calibDoc);

@@ -67,14 +67,14 @@ namespace DisplayModule
         void onPause()  override { LED_Utils::disablePattern(_solidRingID); }
         void onResume() override { LED_Utils::enablePattern(_solidRingID);  }
 
-        std::shared_ptr<ArduinoJson::DynamicJsonDocument> buildTrackPayload() const
+        std::shared_ptr<ArduinoJson::JsonDocument> buildTrackPayload() const
         {
             if (!_currentMsg) { return nullptr; }
 
             auto ping = std::static_pointer_cast<PingMessage>(_currentMsg);
             if (!ping) { return nullptr; }
 
-            auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(512);
+            auto doc = std::make_shared<ArduinoJson::JsonDocument>();
             (*doc)["lat"]     = ping->lat;
             (*doc)["lon"]     = ping->lng;
             (*doc)["color_R"] = ping->color_R;
@@ -83,17 +83,17 @@ namespace DisplayModule
 
             std::vector<MessagePrintInformation> info;
             ping->GetPrintableInformation(info);
-            auto arr = (*doc).createNestedArray("displayTxt");
+            auto arr = (*doc)["displayTxt"].to<ArduinoJson::JsonArray>();
             for (auto &pi : info) { arr.add(pi.txt); }
 
             return doc;
         }
 
-        std::shared_ptr<ArduinoJson::DynamicJsonDocument> buildReplyPayload() const
+        std::shared_ptr<ArduinoJson::JsonDocument> buildReplyPayload() const
         {
             if (!_currentMsg) { return nullptr; }
 
-            auto doc = std::make_shared<ArduinoJson::DynamicJsonDocument>(64);
+            auto doc = std::make_shared<ArduinoJson::JsonDocument>();
             (*doc)["recipientID"] = _currentMsg->sender;
             return doc;
         }
@@ -110,7 +110,7 @@ namespace DisplayModule
             auto ping = std::static_pointer_cast<PingMessage>(_currentMsg);
             if (!ping) { return; }
 
-            ArduinoJson::StaticJsonDocument<128> cfg;
+            ArduinoJson::JsonDocument cfg;
             cfg["rOverride"] = ping->color_R;
             cfg["gOverride"] = ping->color_G;
             cfg["bOverride"] = ping->color_B;

@@ -135,7 +135,7 @@ namespace DisplayModule
         {
             if (!_cachedPing) { return; }
 
-            StaticJsonDocument<256> cfg;
+            JsonDocument cfg;
             cfg["rOverride"] = _cachedPing->color_R;
             cfg["gOverride"] = _cachedPing->color_G;
             cfg["bOverride"] = _cachedPing->color_B;

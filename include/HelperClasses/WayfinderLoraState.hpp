@@ -180,7 +180,7 @@ public:
 
     static void LoadFromFlash()
     {
-        DynamicJsonDocument doc(1024);
+        JsonDocument doc;
         auto rc = FilesystemModule::Utilities::ReadFile(WAYFINDER_MESSAGE_LIST_FILENAME, doc);
         if (rc != FilesystemModule::FilesystemReturnCode::FILESYSTEM_OK)
         {
@@ -192,7 +192,7 @@ public:
 
     static void SaveToFlash()
     {
-        DynamicJsonDocument doc(1024);
+        JsonDocument doc;
         SerializeSavedMessageList(doc);
         auto rc = FilesystemModule::Utilities::WriteFile(WAYFINDER_MESSAGE_LIST_FILENAME, doc);
         if (rc != FilesystemModule::FilesystemReturnCode::FILESYSTEM_OK)
@@ -205,7 +205,7 @@ public:
     {
         JsonArray arr = doc.containsKey("Messages")
                         ? doc["Messages"].as<JsonArray>()
-                        : doc.createNestedArray("Messages");
+                        : doc["Messages"].to<ArduinoJson::JsonArray>();
         for (auto& msg : SavedMessageList()) { arr.add(msg); }
     }
 
@@ -235,7 +235,7 @@ public:
     static void RpcGetSavedMessages(JsonDocument& doc)
     {
         doc.clear();
-        auto arr = doc.createNestedArray("Messages");
+        auto arr = doc["Messages"].to<ArduinoJson::JsonArray>();
         for (auto& msg : SavedMessageList()) { arr.add(msg); }
     }
 

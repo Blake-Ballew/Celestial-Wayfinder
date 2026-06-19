@@ -41,7 +41,7 @@ namespace DisplayModule
 
             if (_message)
             {
-                ArduinoJson::StaticJsonDocument<200> cfg;
+                ArduinoJson::JsonDocument cfg;
                 cfg["rOverride"] = _message->color_R;
                 cfg["gOverride"] = _message->color_G;
                 cfg["bOverride"] = _message->color_B;
