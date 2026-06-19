@@ -175,15 +175,15 @@ private:
         doc["height"] = gfx->height();
 
         // Cast to the concrete type to access getBuffer() — not present on Adafruit_GFX.
-        // SSD1327 is 4bpp greyscale; GFXcanvas1 is 1bpp — buffer sizes differ.
+        // SH1107 is 1bpp greyscale; GFXcanvas1 is 1bpp — buffer sizes differ.
         uint8_t* displayBuffer = nullptr;
         size_t bufferLength = 0;
 
         if (gfx == static_cast<Adafruit_GFX*>(&OledDisplay()))
         {
             displayBuffer = OledDisplay().getBuffer();
-            // 4 bits per pixel (16 grey levels)
-            bufferLength = (gfx->width() * gfx->height()) / 2;
+            // 1 bit per pixel
+            bufferLength = (gfx->width() * gfx->height()) / 8;
         }
         else
         {
