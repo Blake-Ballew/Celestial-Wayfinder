@@ -10,7 +10,7 @@
 #include "MessageIconDrawCommand.hpp"
 #include "NavigationUtils.h"
 #include "LoraUtils.h"
-#include "System_Utils.h"
+#include "SystemUtilities.hpp"
 #include "HelperClasses/WayfinderLoraState.hpp"
 #include <ArduinoJson.h>
 
