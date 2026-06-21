@@ -8,7 +8,7 @@
 #include "CompassUtils.h"
 #include "globalDefines.h"
 #include "LED_Manager.h"
-#include "System_Utils.h"
+#include "SystemUtilities.hpp"
 
 #define SDA_PIN 21
 #define SCL_PIN 22

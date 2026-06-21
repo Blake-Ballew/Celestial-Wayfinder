@@ -7,7 +7,7 @@
 #include "EventDeclarations.h"
 #include "CompassUtils.h"
 #include "globalDefines.h"
-#include "System_Utils.h"
+#include "SystemUtilities.hpp"
 
 #define BUZZER_PIN 4
 #define BATT_SENSE_PIN 39
