@@ -9,3 +9,5 @@ build_number.txt
 !sdkconfig.defaults
 sdkconfig*
 build/version.json
+managed_components/
+dependencies.lock

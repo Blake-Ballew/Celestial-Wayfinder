@@ -393,7 +393,7 @@ public:
         menuItems.push_back(DisplayModule::MenuItem("Reboot", []()
         {
             auto drawCtx = DisplayModule::Utilities::drawContext();
-            drawCtx.display->fillScreen(SSD1306_BLACK);
+            drawCtx.display->fillScreen(BLACK);
             DisplayModule::TextFormat fmt;
             fmt.hAlign = DisplayModule::TextAlignH::CENTER;
             fmt.vAlign = DisplayModule::TextAlignV::CENTER;
@@ -453,7 +453,7 @@ private:
 
     static void EnableServerOnWiFiConnected(WiFiEvent_t event, WiFiEventInfo_t info)
     {
-        if ((int)event == (int)SYSTEM_EVENT_STA_GOT_IP ||
+        if ((int)event == (int)ARDUINO_EVENT_WIFI_STA_GOT_IP ||
             (int)event == (int)ARDUINO_EVENT_WIFI_AP_START)
         {
             ESP_LOGI(TAG, "WiFi event fired, waiting for stack to stabilize...");
@@ -461,7 +461,7 @@ private:
             ESP_LOGI(TAG, "WiFi connected, starting RPC server");
             WebServerInstance.begin();
         }
-        else if ((int)event == (int)SYSTEM_EVENT_STA_DISCONNECTED)
+        else if ((int)event == (int)ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
         {
             // server.end();
         }
