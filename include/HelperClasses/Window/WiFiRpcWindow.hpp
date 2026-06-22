@@ -5,6 +5,7 @@
 #include "States/BroadcastTcpState.hpp"
 #include "DisplayUtilities.hpp"
 #include "RadioUtils.h"
+#include "FilesystemUtils.h"
 
 namespace DisplayModule
 {

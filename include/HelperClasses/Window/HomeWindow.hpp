@@ -13,6 +13,7 @@
 #include "DisplayUtilities.hpp"
 #include "LoraUtils.h"
 #include "NavigationUtils.h"
+#include "FilesystemUtils.h"
 #include "HelperClasses/WayfinderLoraState.hpp"
 #include "HelperClasses/PingMessage.hpp"
 #include <functional>
@@ -292,11 +293,12 @@ namespace DisplayModule
 
                 std::string returnMsg;
 
-                if (payload->containsKey("return"))
+                if (payload->operator[]("return").is<std::string>())
                 {
-                    WayfinderLoraState::AddSavedMessage(payload->operator[]("return").as<const char *>(), true);
+                    auto savedMsg = payload->operator[]("return").as<std::string>();
+                    WayfinderLoraState::AddSavedMessage(savedMsg, true);
                     returnMsg = "Message saved";
-                    ESP_LOGI(TAG, "Saved message: %s", payload->operator[]("return").as<const char *>());
+                    ESP_LOGI(TAG, "Saved message: %s", savedMsg.c_str());
                 }
                 else
                 {
@@ -324,9 +326,9 @@ namespace DisplayModule
             _saveLocationState->bindInput(InputID::BUTTON_2, "Save", [this](const InputContext &ctx) {
                 auto payload = _saveLocationState->buildResultPayload();
 
-                if (payload->containsKey("return"))
+                if (payload->operator[]("return").is<std::string>())
                 {
-                    const char* newLocName = (*payload)["return"].as<const char*>();
+                    std::string newLocName = payload->operator[]("return").as<std::string>();
 
                     double myLat, myLon;
                     if (!NavigationUtils::GetCurrentLocation(myLat, myLon))
@@ -342,7 +344,7 @@ namespace DisplayModule
                     newLoc.Longitude = myLon;
 
                     NavigationUtils::AddSavedLocation(newLoc, true);
-                    ESP_LOGI(TAG, "Saved location: %s (%f, %f)", newLocName, myLat, myLon);
+                    ESP_LOGI(TAG, "Saved location: %s (%f, %f)", newLocName.c_str(), myLat, myLon);
 
                     auto &drawCtx = Utilities::drawContext();
                     drawCtx.display->fillScreen(BLACK);
@@ -511,9 +513,9 @@ namespace DisplayModule
         void _openMessageSelector(const InputContext &ctx, std::shared_ptr<ArduinoJson::JsonDocument> preselectPayload)
         {
             auto arr = (*preselectPayload)["Messages"].to<ArduinoJson::JsonArray>();
-            if (preselectPayload->containsKey("Name"))
+            if (preselectPayload->operator[]("Name").is<std::string>())
             {
-                arr.add(preselectPayload->operator[]("Name"));
+                arr.add(preselectPayload->operator[]("Name").as<std::string>());
             }
 
             for (auto it = WayfinderLoraState::SavedMessageListBegin();

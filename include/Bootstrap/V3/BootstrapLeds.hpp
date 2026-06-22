@@ -17,10 +17,12 @@
 #include "RingPulse.hpp"
 #include "ScrollWheel.hpp"
 #include "SolidRing.hpp"
+#include "RingShutdown.hpp"
 #include "../../HelperClasses/Led/Patterns/Flashlight.hpp"
 
 
 
+#undef NUM_LEDS
 #define NUM_LEDS 61
 #define LED_EN_PIN 15
 #define LED_PIN 16
@@ -32,6 +34,7 @@
 #define NUM_ENCODER_LEDS 8
 
 #define LED_IDX_COMPASS_RING 17
+#undef NUM_COMPASS_LEDS
 #define NUM_COMPASS_LEDS 32
 
 #define LED_IDX_LEFT_TRACE 5
@@ -111,6 +114,13 @@ public:
         System_Utils::getDisablePowerSavings() += []() {
             digitalWrite(LED_EN_PIN, HIGH);
         };
+
+        // Play the shutdown fade before any other shutdown subscriber (e.g. the
+        // MCU bootstrap entering ship mode). PushFront keeps it first regardless
+        // of which bootstrap initializes first.
+        System_Utils::getSystemShutdown().PushFront([]() {
+            LedPatternInterface::PlayBlocking(ShutdownPattern());
+        });
     }
 
     static CRGB *LEDBuffer() 
@@ -118,8 +128,6 @@ public:
         static CRGB leds[NUM_LEDS];
         return leds;
     }
-
-#pragma region LED_Segments
 
     static std::vector<size_t> &CompassRingIndicies()
     {
@@ -184,10 +192,6 @@ public:
         return rightTrace;
     }
 
-#pragma endregion
-
-#pragma region LED_Patterns
-
     static ButtonFlash &ButtonFlashPattern()
     {
         static ButtonFlash buttonFlash(
@@ -246,5 +250,9 @@ public:
         return scrollWheel;
     }
 
-#pragma endregion
+    static RingShutdown &ShutdownPattern()
+    {
+        static RingShutdown shutdown(CompassRingSegment());
+        return shutdown;
+    }
 };

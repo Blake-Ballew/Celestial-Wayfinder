@@ -125,7 +125,7 @@ namespace DisplayModule
             ));
 
             // Countdown in whole seconds — line 3
-            char buf[8];
+            char buf[12];
             int  secsRemaining = (_timerMs / 1000) + 1;
             snprintf(buf, sizeof(buf), "%d", secsRemaining);
 

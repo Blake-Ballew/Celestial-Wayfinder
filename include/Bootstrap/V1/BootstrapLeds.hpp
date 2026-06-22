@@ -17,6 +17,7 @@
 #include "RingPulse.hpp"
 #include "ScrollWheel.hpp"
 #include "SolidRing.hpp"
+#include "RingShutdown.hpp"
 #include "../../HelperClasses/Led/Patterns/Flashlight.hpp"
 
 #define NUM_COMPASS_LEDS 16
@@ -70,6 +71,13 @@ public:
             LED_Utils::configurePattern(buttonFlashPatternID, cfg);
             LED_Utils::loopPattern(buttonFlashPatternID, 1);
         };
+
+        // Play the shutdown fade before any other shutdown subscriber (e.g. the
+        // MCU bootstrap cutting power). PushFront keeps it first regardless of
+        // which bootstrap initializes first.
+        System_Utils::getSystemShutdown().PushFront([]() {
+            LedPatternInterface::PlayBlocking(ShutdownPattern());
+        });
     }
 
     static CRGB *LEDBuffer() 
@@ -157,6 +165,12 @@ public:
     {
         static Flashlight flashlight(FlashlightSegment());
         return flashlight;
+    }
+
+    static RingShutdown &ShutdownPattern()
+    {
+        static RingShutdown shutdown(CompassRingSegment());
+        return shutdown;
     }
 
 #pragma endregion

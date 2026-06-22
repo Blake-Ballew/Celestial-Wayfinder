@@ -15,7 +15,7 @@
 
 #include "RpcManager.h"
 #include "SettingsInterface.hpp"
-#include "Bluetooth_Utils.h"
+#include "BluetoothUtilities.hpp"
 
 #include "HelperClasses/WayfinderLoraState.hpp"
 

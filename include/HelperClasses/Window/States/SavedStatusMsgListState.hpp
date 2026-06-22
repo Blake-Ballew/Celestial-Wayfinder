@@ -53,7 +53,7 @@ namespace DisplayModule
 
         void onEnter(const StateTransferData &data) override
         {
-            if (data.payload && data.payload->containsKey("return"))
+            if (data.payload && data.payload->operator[]("return").is<std::string>())
             {
                 std::string newStr = (*data.payload)["return"].as<std::string>();
 
