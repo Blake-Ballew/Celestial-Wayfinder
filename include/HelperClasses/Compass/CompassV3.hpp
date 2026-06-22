@@ -196,9 +196,9 @@ public:
     // I (1793) COMPASS_V3: Calibration loaded: X[-38.63,60.37] Y[-3.16,105.16] Z[-76.06,43.47]
     void SetCalibrationData(JsonDocument &doc) override
     {
-        if (!doc.containsKey("xMin") || !doc.containsKey("xMax") ||
-            !doc.containsKey("yMin") || !doc.containsKey("yMax") ||
-            !doc.containsKey("zMin") || !doc.containsKey("zMax"))
+        if (!doc["xMin"].is<float>() || !doc["xMax"].is<float>() ||
+            !doc["yMin"].is<float>() || !doc["yMax"].is<float>() ||
+            !doc["zMin"].is<float>() || !doc["zMax"].is<float>())
         {
             ESP_LOGW(TAG_COMPASS_V3, "SetCalibrationData: missing keys, ignoring");
             return;

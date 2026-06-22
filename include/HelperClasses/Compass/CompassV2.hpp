@@ -163,9 +163,9 @@ public:
 
     void SetCalibrationData(JsonDocument &doc)
     {
-        if (!doc.containsKey("xMin") || !doc.containsKey("xMax") ||
-            !doc.containsKey("yMin") || !doc.containsKey("yMax") ||
-            !doc.containsKey("zMin") || !doc.containsKey("zMax"))
+        if (!doc["xMin"].is<float>() || !doc["xMax"].is<float>() ||
+            !doc["yMin"].is<float>() || !doc["yMax"].is<float>() ||
+            !doc["zMin"].is<float>() || !doc["zMax"].is<float>())
         {
             ESP_LOGW(TAG_COMPASS_LSM, "SetCalibrationData: missing keys, ignoring");
             return;

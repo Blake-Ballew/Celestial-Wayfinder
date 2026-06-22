@@ -81,7 +81,6 @@ public:
         });
 
         System_Utils::getSystemShutdown() += []() {
-            LED_Manager::ledShutdownAnimation();
             digitalWrite(KEEP_ALIVE_PIN, LOW);
         };
 

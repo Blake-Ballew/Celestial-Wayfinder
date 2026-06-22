@@ -5,7 +5,7 @@
 #include "FnDrawCommand.hpp"
 #include "TextDrawCommand.hpp"
 #include "DisplayUtilities.hpp"
-#include "Bluetooth_Utils.h"
+#include "BluetoothUtilities.hpp"
 #include "HelperClasses/Window/States/BtState.hpp"
 
 namespace DisplayModule

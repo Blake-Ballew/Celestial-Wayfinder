@@ -15,12 +15,12 @@ public:
 
     void configurePattern(JsonDocument &config)
     {
-        if (config.containsKey("on"))
+        if (config["on"].is<bool>())
         {
-            _on = config["on"];
+            _on = config["on"].as<bool>();
         }
 
-        if (config.containsKey("toggle"))
+        if (config["toggle"].is<bool>())
         {
             _on = !_on;
         }

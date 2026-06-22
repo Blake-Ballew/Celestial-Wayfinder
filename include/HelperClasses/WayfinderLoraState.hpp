@@ -203,7 +203,7 @@ public:
 
     static void SerializeSavedMessageList(JsonDocument& doc)
     {
-        JsonArray arr = doc.containsKey("Messages")
+        JsonArray arr = doc["Messages"].is<JsonArray>()
                         ? doc["Messages"].as<JsonArray>()
                         : doc["Messages"].to<ArduinoJson::JsonArray>();
         for (auto& msg : SavedMessageList()) { arr.add(msg); }
@@ -225,7 +225,7 @@ public:
 
     static void RpcGetSavedMessage(JsonDocument& doc)
     {
-        if (!doc.containsKey("Idx")) { return; }
+        if (!doc["Idx"].is<int>()) { return; }
         auto idx = doc["Idx"].as<int>();
         auto& list = SavedMessageList();
         doc.clear();
@@ -241,7 +241,7 @@ public:
 
     static void RpcAddSavedMessage(JsonDocument& doc)
     {
-        if (doc.containsKey("Message"))
+        if (doc["Message"].is<std::string>())
         {
             AddSavedMessage(doc["Message"].as<std::string>(), true);
         }
@@ -251,7 +251,7 @@ public:
 
     static void RpcAddSavedMessages(JsonDocument& doc)
     {
-        if (doc.containsKey("Messages"))
+        if (doc["Messages"].is<JsonArray>())
         {
             for (auto msg : doc["Messages"].as<JsonArray>())
             {
@@ -265,7 +265,7 @@ public:
     static void RpcDeleteSavedMessage(JsonDocument& doc)
     {
         bool success = false;
-        if (doc.containsKey("Idx"))
+        if (doc["Idx"].is<int>())
         {
             auto idx = doc["Idx"].as<int>();
             auto& list = SavedMessageList();
@@ -290,7 +290,7 @@ public:
     static void RpcUpdateSavedMessage(JsonDocument& doc)
     {
         bool success = false;
-        if (doc.containsKey("Idx") && doc.containsKey("Message"))
+        if (doc["Idx"].is<int>() && doc["Message"].is<std::string>())
         {
             auto idx = doc["Idx"].as<int>();
             auto& list = SavedMessageList();

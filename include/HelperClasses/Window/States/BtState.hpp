@@ -2,7 +2,7 @@
 
 #include "WindowState.hpp"
 #include "QrCodeDrawCommand.hpp"
-#include "Bluetooth_Utils.h"
+#include "BluetoothUtilities.hpp"
 
 #include "esp_task_wdt.h"
 #include <nvs_flash.h>
